@@ -269,45 +269,21 @@
 
             status.innerText = `Querying live DoneDeal market index for ${year} ${make} ${model}...`;
 
-            const rawTargetUrl = 'https://www.donedeal.ie/search/api/v4/find/';
-            const payload = {
-                section: 'cars',
-                adType: 'forsale',
-                sort: 'relevance desc',
-                max: 30,
-                start: 0,
-                words: `${make} ${model} ${year}`
-            };
+            const workerUrl = `https://pj-val-proxy.pauljordanie.workers.dev/?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year=${encodeURIComponent(year)}`;
 
             let data = null;
 
-            // Strategy 1: Dedicated CORS Gateway
             try {
-                const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(rawTargetUrl);
-                const res = await fetch(proxyUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                const res = await fetch(workerUrl);
                 if (res.ok) data = await res.json();
-            } catch (err) {}
-
-            // Strategy 2: Direct Fetch
-            if (!data) {
-                try {
-                    const res = await fetch(rawTargetUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (res.ok) data = await res.json();
-                } catch (err) {}
+            } catch (err) {
+                console.error(err);
             }
 
             const searchLink = `https://www.donedeal.ie/cars/${make.toLowerCase()}/${model.toLowerCase().replace(' ', '-')}?year_from=${year}&year_to=${year}`;
 
             if (!data || !data.ads || data.ads.length === 0) {
-                status.innerHTML = `Mobile network CORS prevented background scrape.<br>` +
+                status.innerHTML = `Could not load listings via worker bridge.<br>` +
                     `<a href="${searchLink}" target="_blank" class="action-link">Open ${year} ${make} ${model} on DoneDeal ↗</a>`;
                 return;
             }
