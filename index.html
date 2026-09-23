@@ -1,1933 +1,253 @@
-package com.motortrade;
-
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
-import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.client.util.store.FileDataStoreFactory;
-import com.google.api.services.drive.Drive;
-import com.google.api.services.drive.DriveScopes;
-import com.google.api.services.sheets.v4.Sheets;
-import com.google.api.services.sheets.v4.SheetsScopes;
-import com.google.api.services.sheets.v4.model.*;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
-import javafx.application.Application;
-import javafx.application.Platform;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
-import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
-import javafx.scene.layout.*;
-import javafx.stage.FileChooser;
-import javafx.stage.Stage;
-import javafx.util.StringConverter;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-
-import java.io.*;
-import java.lang.reflect.Type;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
-
-public class MotorTradeApp extends Application {
-
-    private static final String SPREADSHEET_ID = "1H-GIwXcZoxINcVYGA4fOzAXw9o9rtNJ4_GHuidlhjvg";
-    private static final String LOCAL_EXCEL_PATH = "PJ_Motor_Trade_Business_Accounts_Fixed_2026.xlsx";
-    private static final String MARKET_CACHE_PATH = "market_cache.json";
-
-    private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
-    private static final List<String> SCOPES = Arrays.asList(DriveScopes.DRIVE, SheetsScopes.SPREADSHEETS);
-    private static final String TOKENS_DIRECTORY_PATH = "tokens";
-
-    private static final DateTimeFormatter EU_UI_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final DateTimeFormatter DISPLAY_DATE_FMT = DateTimeFormatter.ofPattern("dd-MMM-yyyy", Locale.ENGLISH);
-
-    private TextArea logArea;
-    private TableView<ObservableList<String>> masterTableView;
-    private TableView<VatPeriodSummary> vatTableView;
-
-    private Label cardIncomeVal;
-    private Label cardIncomeSub;
-    private Label cardExpenseVal;
-    private Label cardExpenseSub;
-    private Label cardProfitVal;
-    private Label cardProfitSub;
-
-    private Label valDealerHigh;
-    private Label valMarketAvg;
-    private Label valTradeLow;
-    private Label valCacheStatus;
-    private TableView<MarketListing> marketTableView;
-
-    @Override
-    public void start(Stage primaryStage) {
-        Locale.setDefault(Locale.UK);
-
-        primaryStage.setTitle("PJ Motor Trade Accounts & Revenue System");
-
-        TabPane tabPane = new TabPane();
-
-        Tab masterTab = new Tab("Master Sheet Overview", wrapInPadding(createMasterView()));
-        masterTab.setClosable(false);
-
-        Tab vatTab = new Tab("VAT Returns (Bimonthly)", wrapInPadding(createVatReturnView()));
-        vatTab.setClosable(false);
-
-        Tab valuationTab = new Tab("Market Valuation Guide", wrapInPadding(createValuationView()));
-        valuationTab.setClosable(false);
-
-        Tab carTab = new Tab("Car Purchase & Sales", wrapInPadding(createCarView(primaryStage)));
-        carTab.setClosable(false);
-
-        Tab expenseTab = new Tab("Log Expense / Overhead", wrapInPadding(createExpenseView()));
-        expenseTab.setClosable(false);
-
-        Tab syncTab = new Tab("Google Drive Sync", wrapInPadding(createSyncView()));
-        syncTab.setClosable(false);
-
-        tabPane.getTabs().addAll(masterTab, vatTab, valuationTab, carTab, expenseTab, syncTab);
-
-        Scene scene = new Scene(tabPane, 1080, 770);
-
-        String cssData = ""
-                + ".root { -fx-font-family: 'Segoe UI', sans-serif; -fx-font-size: 13px; -fx-background-color: #F1F5F9; }\n"
-                + ".tab-pane .tab-header-area { -fx-background-color: #0F172A; -fx-padding: 8 16 0 16; }\n"
-                + ".tab-pane .tab-header-background { -fx-background-color: transparent; }\n"
-                + ".tab { -fx-background-color: #1E293B; -fx-background-radius: 6 6 0 0; -fx-padding: 8 16; }\n"
-                + ".tab:selected { -fx-background-color: #F1F5F9; }\n"
-                + ".tab .tab-label { -fx-text-fill: #94A3B8; -fx-font-weight: bold; }\n"
-                + ".tab:selected .tab-label { -fx-text-fill: #0F172A; }\n"
-                + ".card-panel { -fx-background-color: #FFFFFF; -fx-background-radius: 10; -fx-padding: 20; -fx-effect: dropshadow(gaussian, rgba(15,23,42,0.10), 14, 0, 0, 4); }\n"
-                + ".section-header { -fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #0F172A; }\n"
-                + ".field-label { -fx-font-weight: bold; -fx-text-fill: #475569; }\n"
-                + ".text-field, .combo-box, .date-picker > .text-field { -fx-background-color: #FFFFFF; -fx-border-color: #CBD5E1; -fx-border-radius: 6; -fx-background-radius: 6; -fx-padding: 7 12; -fx-text-fill: #0F172A; }\n"
-                + ".text-field:focused, .combo-box:focused, .date-picker:focused { -fx-border-color: #0284C7; -fx-effect: dropshadow(gaussian, rgba(2,132,199,0.25), 4, 0, 0, 0); }\n"
-                + ".btn-primary { -fx-background-color: #0284C7; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 13px; -fx-background-radius: 6; -fx-padding: 9 18; -fx-cursor: hand; }\n"
-                + ".btn-secondary { -fx-background-color: #475569; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 13px; -fx-background-radius: 6; -fx-padding: 9 16; -fx-cursor: hand; }\n"
-                + ".btn-success { -fx-background-color: #16A34A; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 13px; -fx-background-radius: 6; -fx-padding: 9 18; -fx-cursor: hand; }\n"
-                + ".badge-vat { -fx-background-color: #EFF6FF; -fx-border-color: #BFDBFE; -fx-border-radius: 6; -fx-background-radius: 6; -fx-padding: 8 12; -fx-text-fill: #1D4ED8; -fx-font-weight: bold; }\n"
-                + ".badge-profit { -fx-background-color: #F0FDF4; -fx-border-color: #BBF7D0; -fx-border-radius: 6; -fx-background-radius: 6; -fx-padding: 8 12; -fx-text-fill: #15803D; -fx-font-weight: bold; }\n"
-                + ".terminal-log { -fx-control-inner-background: #0F172A; -fx-text-fill: #38BDF8; -fx-font-family: 'Consolas', monospace; -fx-font-size: 12px; -fx-border-radius: 6; -fx-background-radius: 6; }\n"
-                + ".stat-box-blue { -fx-background-color: #EFF6FF; -fx-border-color: #BFDBFE; -fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 12; }\n"
-                + ".stat-box-yellow { -fx-background-color: #FEFCE8; -fx-border-color: #FEF08A; -fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 12; }\n"
-                + ".stat-box-green { -fx-background-color: #F0FDF4; -fx-border-color: #BBF7D0; -fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 12; }\n"
-                + ".stat-title { -fx-font-size: 11px; -fx-font-weight: bold; }\n"
-                + ".stat-value { -fx-font-size: 20px; -fx-font-weight: bold; }\n"
-                + ".stat-sub { -fx-font-size: 11px; -fx-font-style: italic; -fx-text-fill: #64748B; }\n"
-                + ".table-view { -fx-background-color: transparent; -fx-border-color: #CBD5E1; -fx-border-radius: 8; -fx-background-radius: 8; }\n"
-                + ".table-view .column-header-background { -fx-background-color: #0F172A; }\n"
-                + ".table-view .column-header { -fx-background-color: transparent; -fx-font-weight: bold; -fx-padding: 8; }\n"
-                + ".table-view .column-header .label { -fx-text-fill: #F8FAFC; }\n"
-                + ".table-row-cell:odd { -fx-background-color: #F8FAFC; }\n"
-                + ".table-row-cell:even { -fx-background-color: #FFFFFF; }\n"
-                + ".table-row-cell:selected { -fx-background-color: #E2E8F0; }\n"
-                + ".table-cell { -fx-text-fill: #0F172A; -fx-padding: 6 10; }\n";
-
-        String base64Css = "data:text/css;base64," + Base64.getEncoder().encodeToString(cssData.getBytes(StandardCharsets.UTF_8));
-        scene.getStylesheets().add(base64Css);
-
-        primaryStage.setScene(scene);
-        primaryStage.show();
-
-        java.io.File localFile = new java.io.File(LOCAL_EXCEL_PATH);
-        if (!localFile.exists()) {
-            new Thread(() -> {
-                try {
-                    log("Local ledger not found. Initializing cache from Google Drive...");
-                    pullFullWorkbookFromDrive();
-                    loadMasterSheetData();
-                    loadVatReturnsData();
-                } catch (Exception ex) {
-                    log("Init Note: " + ex.getMessage());
-                }
-            }).start();
-        } else {
-            loadMasterSheetData();
-            loadVatReturnsData();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PJ Motor Trade - Market Valuation</title>
+    <style>
+        :root {
+            --primary: #0284C7;
+            --bg: #F1F5F9;
+            --card-bg: #FFFFFF;
+            --text: #0F172A;
+            --border: #CBD5E1;
         }
-    }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 12px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            margin-bottom: 16px;
+        }
+        h2 { margin-top: 0; font-size: 1.25rem; color: #1E293B; }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #475569;
+            margin-bottom: 4px;
+        }
+        select, button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            background: #fff;
+            box-sizing: border-box;
+        }
+        button.btn-search {
+            background-color: var(--primary);
+            color: white;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .stat-box {
+            background: #F8FAFC;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        .stat-title { font-size: 0.75rem; font-weight: bold; color: #64748B; }
+        .stat-val { font-size: 1.4rem; font-weight: bold; color: #0F172A; margin: 4px 0; }
+        .listing-item {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .listing-info { flex-grow: 1; padding-right: 8px; }
+        .listing-title { font-size: 0.9rem; font-weight: 600; color: #1E293B; margin-bottom: 2px; }
+        .listing-meta { font-size: 0.75rem; color: #64748B; }
+        .listing-price { font-size: 1rem; font-weight: bold; color: #0284C7; white-space: nowrap; }
+        .btn-view {
+            display: inline-block;
+            background: #0EA5E9;
+            color: white;
+            text-decoration: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-top: 4px;
+        }
+        #status { font-style: italic; font-size: 0.85rem; color: #64748B; text-align: center; margin: 10px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h2>Irish Market Valuation</h2>
+        <div class="form-group">
+            <label>Make</label>
+            <select id="makeSelect" onchange="updateModels()">
+                <option value="Nissan">Nissan</option>
+                <option value="Volkswagen">Volkswagen</option>
+                <option value="Ford">Ford</option>
+                <option value="Peugeot">Peugeot</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Model</label>
+            <select id="modelSelect"></select>
+        </div>
+        <div class="form-group">
+            <label>Year</label>
+            <select id="yearSelect"></select>
+        </div>
+        <button class="btn-search" onclick="fetchMarket()">Check Live Market</button>
+    </div>
 
-    private StringConverter<LocalDate> createEuDateConverter() {
-        return new StringConverter<>() {
-            @Override
-            public String toString(LocalDate date) {
-                return (date != null) ? EU_UI_FORMATTER.format(date) : "";
-            }
+    <div class="stats-grid">
+        <div class="stat-box" style="border-color: #BBF7D0; background: #F0FDF4;">
+            <div class="stat-title" style="color: #15803D;">RETAIL GUIDE (MINT)</div>
+            <div class="stat-val" id="valHigh">€0</div>
+        </div>
+        <div class="stat-box" style="border-color: #BFDBFE; background: #EFF6FF;">
+            <div class="stat-title" style="color: #1D4ED8;">MARKET AVERAGE</div>
+            <div class="stat-val" id="valAvg">€0</div>
+        </div>
+        <div class="stat-box" style="border-color: #FEF08A; background: #FEFCE8;">
+            <div class="stat-title" style="color: #B45309;">TRADE / PROJECT TARGET</div>
+            <div class="stat-val" id="valLow">€0</div>
+        </div>
+    </div>
 
-            @Override
-            public LocalDate fromString(String string) {
-                if (string != null && !string.trim().isEmpty()) {
-                    try {
-                        return LocalDate.parse(string.trim(), EU_UI_FORMATTER);
-                    } catch (Exception ignored) {}
-                }
-                return null;
-            }
-        };
-    }
+    <div id="status">Select make, model, and year above to search.</div>
+    <div id="listingsContainer"></div>
+</div>
 
-    private StackPane wrapInPadding(VBox content) {
-        StackPane wrapper = new StackPane(content);
-        wrapper.setPadding(new Insets(18));
-        return wrapper;
-    }
+<script>
+    const models = {
+        "Nissan": ["Qashqai", "Juke", "Micra", "X-Trail", "Note"],
+        "Volkswagen": ["Golf", "Passat", "Polo", "Tiguan", "Caddy"],
+        "Ford": ["Focus", "Fiesta", "Mondeo", "Kuga", "Transit Connect"],
+        "Peugeot": ["208", "308", "2008", "3008", "5008", "508"]
+    };
 
-    // ==========================================
-    // 1. MASTER SHEET OVERVIEW
-    // ==========================================
-    private VBox createMasterView() {
-        VBox card = new VBox(14);
-        card.getStyleClass().add("card-panel");
-
-        Label title = new Label("Executive Business Overview & Profit and Loss");
-        title.getStyleClass().add("section-header");
-
-        VBox box1 = new VBox(4);
-        box1.getStyleClass().add("stat-box-blue");
-        box1.setAlignment(Pos.CENTER);
-        Label t1 = new Label("TOTAL INCOME FROM CAR SALES"); t1.getStyleClass().add("stat-title"); t1.setStyle("-fx-text-fill: #1D4ED8;");
-        cardIncomeVal = new Label("€0.00"); cardIncomeVal.getStyleClass().add("stat-value"); cardIncomeVal.setStyle("-fx-text-fill: #1E3A8A;");
-        cardIncomeSub = new Label("Gross Vehicle Sales Turnover"); cardIncomeSub.getStyleClass().add("stat-sub");
-        box1.getChildren().addAll(t1, cardIncomeVal, cardIncomeSub);
-        HBox.setHgrow(box1, Priority.ALWAYS);
-
-        VBox box2 = new VBox(4);
-        box2.getStyleClass().add("stat-box-yellow");
-        box2.setAlignment(Pos.CENTER);
-        Label t2 = new Label("TOTAL MONEY SPENT ON CARS"); t2.getStyleClass().add("stat-title"); t2.setStyle("-fx-text-fill: #B45309;");
-        cardExpenseVal = new Label("€0.00"); cardExpenseVal.getStyleClass().add("stat-value"); cardExpenseVal.setStyle("-fx-text-fill: #78350F;");
-        cardExpenseSub = new Label("Stock Purchases & Allocated Prep Costs"); cardExpenseSub.getStyleClass().add("stat-sub");
-        box2.getChildren().addAll(t2, cardExpenseVal, cardExpenseSub);
-        HBox.setHgrow(box2, Priority.ALWAYS);
-
-        VBox box3 = new VBox(4);
-        box3.getStyleClass().add("stat-box-green");
-        box3.setAlignment(Pos.CENTER);
-        Label t3 = new Label("NET BUSINESS PROFIT / (LOSS)"); t3.getStyleClass().add("stat-title"); t3.setStyle("-fx-text-fill: #15803D;");
-        cardProfitVal = new Label("€0.00"); cardProfitVal.getStyleClass().add("stat-value"); cardProfitVal.setStyle("-fx-text-fill: #064E3B;");
-        cardProfitSub = new Label("Net Operating Profit / Loss Position"); cardProfitSub.getStyleClass().add("stat-sub");
-        box3.getChildren().addAll(t3, cardProfitVal, cardProfitSub);
-        HBox.setHgrow(box3, Priority.ALWAYS);
-
-        HBox statsRow = new HBox(12, box1, box2, box3);
-
-        Button refreshBtn = new Button("🔄 Refresh Executive Overview");
-        refreshBtn.getStyleClass().add("btn-primary");
-
-        refreshBtn.setOnAction(e -> {
-            new Thread(() -> {
-                try {
-                    log("Refreshing overview from Google Sheets...");
-                    pullFullWorkbookFromDrive();
-                    loadMasterSheetData();
-                    loadVatReturnsData();
-                    Platform.runLater(() -> showAlert(Alert.AlertType.INFORMATION, "Overview refreshed from Google."));
-                } catch (Exception ex) {
-                    log("ERROR: " + ex.getMessage());
-                    Platform.runLater(() -> showAlert(Alert.AlertType.ERROR, "Refresh Failed: " + ex.getMessage()));
-                }
-            }).start();
+    function updateModels() {
+        const make = document.getElementById("makeSelect").value;
+        const modelSelect = document.getElementById("modelSelect");
+        modelSelect.innerHTML = "";
+        models[make].forEach(m => {
+            let opt = document.createElement("option");
+            opt.value = m;
+            opt.textContent = m;
+            modelSelect.appendChild(opt);
         });
-
-        masterTableView = new TableView<>();
-        masterTableView.setPrefHeight(380);
-        masterTableView.setPlaceholder(new Label("No rows loaded from Master Sheet."));
-
-        card.getChildren().addAll(title, statsRow, refreshBtn, masterTableView);
-        return card;
     }
 
-    private void loadMasterSheetData() {
-        java.io.File file = new java.io.File(LOCAL_EXCEL_PATH);
-        if (!file.exists()) return;
-
-        new Thread(() -> {
-            try (org.apache.poi.ss.usermodel.Workbook wb = new XSSFWorkbook(new FileInputStream(file))) {
-                org.apache.poi.ss.usermodel.Sheet sheet = wb.getSheet("Master Sheet");
-                if (sheet == null) {
-                    for (int i = 0; i < wb.getNumberOfSheets(); i++) {
-                        if (wb.getSheetName(i).toLowerCase().contains("master")) {
-                            sheet = wb.getSheetAt(i);
-                            break;
-                        }
-                    }
-                }
-                if (sheet == null) sheet = wb.getSheetAt(0);
-
-                String incomeVal = "€0.00", incomeSub = "Gross Vehicle Sales Turnover";
-                String expenseVal = "€0.00", expenseSub = "Stock Purchases & Allocated Prep Costs";
-                String profitVal = "€0.00", profitSub = "Net Operating Profit / Loss Position";
-
-                Row r4 = sheet.getRow(4);
-                Row r5 = sheet.getRow(5);
-
-                if (r4 != null) {
-                    incomeVal = getFormattedCellValue(r4.getCell(1));
-                    expenseVal = getFormattedCellValue(r4.getCell(3));
-                    profitVal = getFormattedCellValue(r4.getCell(5));
-                }
-                if (r5 != null) {
-                    String s1 = getFormattedCellValue(r5.getCell(1));
-                    if (!s1.isEmpty()) incomeSub = s1;
-                    String s2 = getFormattedCellValue(r5.getCell(3));
-                    if (!s2.isEmpty()) expenseSub = s2;
-                    String s3 = getFormattedCellValue(r5.getCell(5));
-                    if (!s3.isEmpty()) profitSub = s3;
-                }
-
-                final String finalIncomeVal = incomeVal;
-                final String finalIncomeSub = incomeSub;
-                final String finalExpenseVal = expenseVal;
-                final String finalExpenseSub = expenseSub;
-                final String finalProfitVal = profitVal;
-                final String finalProfitSub = profitSub;
-
-                Row headerRow = sheet.getRow(9);
-                List<String> headers = new ArrayList<>();
-                int startCol = 1;
-                int endCol = 6;
-
-                if (headerRow != null) {
-                    for (int c = startCol; c <= endCol; c++) {
-                        String h = getFormattedCellValue(headerRow.getCell(c));
-                        headers.add((h == null || h.trim().isEmpty()) ? "Col " + c : h.trim());
-                    }
-                } else {
-                    headers = Arrays.asList("Metric / Category", "Gross Price (€)", "VAT (€)", "Net (€)", "Units", "Avg / Note");
-                }
-
-                ObservableList<ObservableList<String>> tableRows = FXCollections.observableArrayList();
-
-                for (int r = 10; r <= sheet.getLastRowNum(); r++) {
-                    Row row = sheet.getRow(r);
-                    if (row == null) continue;
-
-                    ObservableList<String> rowValues = FXCollections.observableArrayList();
-                    boolean hasContent = false;
-                    for (int c = startCol; c <= endCol; c++) {
-                        String val = getFormattedCellValue(row.getCell(c));
-                        if (val != null && !val.trim().isEmpty()) {
-                            hasContent = true;
-                        }
-                        rowValues.add(val != null ? val : "");
-                    }
-                    if (hasContent) {
-                        tableRows.add(rowValues);
-                    }
-                }
-
-                final List<String> finalHeaders = headers;
-                Platform.runLater(() -> {
-                    cardIncomeVal.setText(finalIncomeVal);
-                    cardIncomeSub.setText(finalIncomeSub);
-
-                    cardExpenseVal.setText(finalExpenseVal);
-                    cardExpenseSub.setText(finalExpenseSub);
-
-                    cardProfitVal.setText(finalProfitVal);
-                    cardProfitSub.setText(finalProfitSub);
-
-                    if (finalProfitVal.contains("-")) {
-                        cardProfitVal.setStyle("-fx-text-fill: #DC2626;");
-                    } else {
-                        cardProfitVal.setStyle("-fx-text-fill: #064E3B;");
-                    }
-
-                    masterTableView.getColumns().clear();
-                    for (int i = 0; i < finalHeaders.size(); i++) {
-                        final int colIdx = i;
-                        TableColumn<ObservableList<String>, String> column = new TableColumn<>(finalHeaders.get(i));
-                        column.setCellValueFactory(param -> {
-                            ObservableList<String> row = param.getValue();
-                            return new SimpleStringProperty(colIdx < row.size() ? row.get(colIdx) : "");
-                        });
-                        column.setPrefWidth(140);
-                        if (colIdx > 0 && colIdx < 4) {
-                            column.setStyle("-fx-alignment: CENTER-RIGHT;");
-                        }
-                        masterTableView.getColumns().add(column);
-                    }
-                    masterTableView.setItems(tableRows);
-                    log("Master Sheet parsed with evaluated figures.");
-                });
-
-            } catch (Exception ex) {
-                log("Error reading Master Sheet: " + ex.getMessage());
-            }
-        }).start();
+    // Initialize Year dropdown
+    const yearSelect = document.getElementById("yearSelect");
+    for (let y = 2026; y >= 2006; y--) {
+        let opt = document.createElement("option");
+        opt.value = y;
+        opt.textContent = y;
+        if (y === 2011) opt.selected = true;
+        yearSelect.appendChild(opt);
     }
 
-    private String getFormattedCellValue(org.apache.poi.ss.usermodel.Cell cell) {
-        if (cell == null) return "";
+    updateModels();
+
+    async function fetchMarket() {
+        const make = document.getElementById("makeSelect").value;
+        const model = document.getElementById("modelSelect").value;
+        const year = document.getElementById("yearSelect").value;
+        const statusEl = document.getElementById("status");
+        const container = document.getElementById("listingsContainer");
+
+        statusEl.textContent = `Scanning live market for ${year} ${make} ${model}...`;
+        container.innerHTML = "";
+
+        // Using a public CORS-friendly proxy or direct endpoint fetch simulation
         try {
-            CellType type = cell.getCellType();
-            if (type == CellType.FORMULA) {
-                type = cell.getCachedFormulaResultType();
-            }
-
-            switch (type) {
-                case NUMERIC:
-                    if (DateUtil.isCellDateFormatted(cell)) {
-                        return cell.getLocalDateTimeCellValue().toLocalDate().format(DISPLAY_DATE_FMT);
-                    }
-                    double val = cell.getNumericCellValue();
-                    String fmt = cell.getCellStyle() != null ? cell.getCellStyle().getDataFormatString() : "";
-                    if (fmt != null && fmt.contains("%")) {
-                        return String.format(Locale.ENGLISH, "%.1f%%", val * 100.0);
-                    }
-                    if (val == (long) val && Math.abs(val) < 1000 && (fmt == null || (!fmt.contains("€") && !fmt.contains(".00")))) {
-                        return String.valueOf((long) val);
-                    }
-                    return String.format(Locale.ENGLISH, "€%,.2f", val);
-
-                case STRING:
-                    return cell.getStringCellValue().trim();
-
-                case BOOLEAN:
-                    return String.valueOf(cell.getBooleanCellValue());
-
-                case BLANK:
-                default:
-                    return "";
-            }
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    // ==========================================
-    // 2. BIMONTHLY VAT TAB + ROS COPY HELPER
-    // ==========================================
-    public static class VatPeriodSummary {
-        private final SimpleStringProperty period;
-        private final SimpleStringProperty vatOnIncome;
-        private final SimpleStringProperty vatToClaim;
-        private final SimpleStringProperty netVatBalance;
-        private final SimpleStringProperty status;
-        private final double rawIncome;
-        private final double rawClaim;
-        private final double rawNet;
-
-        public VatPeriodSummary(String period, double incomeVat, double claimVat, double netVat) {
-            this.period = new SimpleStringProperty(period);
-            this.rawIncome = incomeVat;
-            this.rawClaim = claimVat;
-            this.rawNet = netVat;
-
-            this.vatOnIncome = new SimpleStringProperty(String.format("€%.2f", incomeVat));
-            this.vatToClaim = new SimpleStringProperty(String.format("€%.2f", claimVat));
-            this.netVatBalance = new SimpleStringProperty(String.format("€%.2f", netVat));
-
-            if (netVat > 0.005) {
-                this.status = new SimpleStringProperty("Payment Due to Revenue");
-            } else if (netVat < -0.005) {
-                this.status = new SimpleStringProperty("Refund Claimable from Revenue");
-            } else {
-                this.status = new SimpleStringProperty("Balanced (€0.00)");
-            }
-        }
-
-        public String getPeriod() { return period.get(); }
-        public String getVatOnIncome() { return vatOnIncome.get(); }
-        public String getVatToClaim() { return vatToClaim.get(); }
-        public String getNetVatBalance() { return netVatBalance.get(); }
-        public String getStatus() { return status.get(); }
-        public double getRawIncome() { return rawIncome; }
-        public double getRawClaim() { return rawClaim; }
-        public double getRawNet() { return rawNet; }
-    }
-
-    private VBox createVatReturnView() {
-        VBox card = new VBox(16);
-        card.getStyleClass().add("card-panel");
-
-        Label title = new Label("Bimonthly VAT Returns Summary (Form VAT3 Breakdown)");
-        title.getStyleClass().add("section-header");
-
-        Label subtitle = new Label("Calculates VAT on Income (T1), Deductible VAT on Expenses (T2), and Net Balance directly from your verified ledger.");
-        subtitle.setStyle("-fx-text-fill: #64748B; -fx-font-size: 12px;");
-
-        vatTableView = new TableView<>();
-        vatTableView.setPrefHeight(380);
-        vatTableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-
-        TableColumn<VatPeriodSummary, String> colPeriod = new TableColumn<>("Bimonthly Period");
-        colPeriod.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPeriod()));
-        colPeriod.setPrefWidth(150);
-
-        TableColumn<VatPeriodSummary, String> colIncomeVat = new TableColumn<>("1. VAT on Income (T1)");
-        colIncomeVat.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getVatOnIncome()));
-        colIncomeVat.setStyle("-fx-alignment: CENTER-RIGHT; -fx-text-fill: #1E3A8A; -fx-font-weight: bold;");
-
-        TableColumn<VatPeriodSummary, String> colClaimVat = new TableColumn<>("2. VAT to Claim Back (T2)");
-        colClaimVat.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getVatToClaim()));
-        colClaimVat.setStyle("-fx-alignment: CENTER-RIGHT; -fx-text-fill: #15803D; -fx-font-weight: bold;");
-
-        TableColumn<VatPeriodSummary, String> colNet = new TableColumn<>("3. Final Net VAT Balance");
-        colNet.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getNetVatBalance()));
-        colNet.setStyle("-fx-alignment: CENTER-RIGHT; -fx-font-weight: bold;");
-
-        TableColumn<VatPeriodSummary, String> colStatus = new TableColumn<>("Revenue Status");
-        colStatus.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getStatus()));
-        colStatus.setStyle("-fx-alignment: CENTER;");
-
-        vatTableView.getColumns().addAll(colPeriod, colIncomeVat, colClaimVat, colNet, colStatus);
-
-        Button refreshBtn = new Button("🔄 Refresh VAT Calculations");
-        refreshBtn.getStyleClass().add("btn-primary");
-        refreshBtn.setOnAction(e -> {
-            new Thread(() -> {
-                try {
-                    log("Refreshing VAT calculations from Google...");
-                    pullFullWorkbookFromDrive();
-                    loadVatReturnsData();
-                    Platform.runLater(() -> showAlert(Alert.AlertType.INFORMATION, "Bimonthly VAT returns updated."));
-                } catch (Exception ex) {
-                    log("VAT Refresh Error: " + ex.getMessage());
-                }
-            }).start();
-        });
-
-        Button copyRosBtn = new Button("📋 Copy Selected Period Figures for ROS Form VAT3");
-        copyRosBtn.getStyleClass().add("btn-secondary");
-        copyRosBtn.setOnAction(e -> {
-            VatPeriodSummary selected = vatTableView.getSelectionModel().getSelectedItem();
-            if (selected == null) {
-                showAlert(Alert.AlertType.WARNING, "Please select a bimonthly period row in the table first.");
-                return;
-            }
-            long t1Round = Math.round(selected.getRawIncome());
-            long t2Round = Math.round(selected.getRawClaim());
-            long netRound = t1Round - t2Round;
-
-            String rosSummary = String.format(
-                    "--- ROS FORM VAT3 FIGURES (%s) ---\n" +
-                            "Box T1 (VAT on Sales): €%d\n" +
-                            "Box T2 (VAT on Deductions): €%d\n" +
-                            (netRound >= 0 ? "Box T3 (Net VAT Payable): €%d\n" : "Box T4 (Net VAT Repayable): €%d\n") +
-                            "Status: %s\n" +
-                            "----------------------------------",
-                    selected.getPeriod(), t1Round, t2Round, Math.abs(netRound), selected.getStatus()
-            );
-
-            Clipboard clipboard = Clipboard.getSystemClipboard();
-            ClipboardContent content = new ClipboardContent();
-            content.putString(rosSummary);
-            clipboard.setContent(content);
-
-            showAlert(Alert.AlertType.INFORMATION, "ROS Form VAT3 figures copied to clipboard!\n\n" + rosSummary);
-        });
-
-        HBox btnRow = new HBox(12, refreshBtn, copyRosBtn);
-        card.getChildren().addAll(title, subtitle, btnRow, vatTableView);
-        return card;
-    }
-
-    private void loadVatReturnsData() {
-        java.io.File file = new java.io.File(LOCAL_EXCEL_PATH);
-        if (!file.exists()) return;
-
-        new Thread(() -> {
-            try (org.apache.poi.ss.usermodel.Workbook wb = new XSSFWorkbook(new FileInputStream(file))) {
-                DataFormatter formatter = new DataFormatter();
-                String[] periodKeys = {"Jan - Feb", "Mar - Apr", "May - Jun", "Jul - Aug", "Sep - Oct", "Nov - Dec"};
-
-                Map<String, Double> incomeVatMap = new LinkedHashMap<>();
-                Map<String, Double> claimVatMap = new LinkedHashMap<>();
-                Map<String, Double> columnMNetMap = new LinkedHashMap<>();
-
-                for (String p : periodKeys) {
-                    incomeVatMap.put(p, 0.0);
-                    claimVatMap.put(p, 0.0);
-                    columnMNetMap.put(p, null);
-                }
-
-                org.apache.poi.ss.usermodel.Sheet vatReturnsSheet = wb.getSheet("VAT Returns");
-                if (vatReturnsSheet != null) {
-                    for (int r = 0; r <= vatReturnsSheet.getLastRowNum(); r++) {
-                        Row row = vatReturnsSheet.getRow(r);
-                        if (row == null) continue;
-
-                        for (int c = 0; c < row.getLastCellNum(); c++) {
-                            String txt = formatter.formatCellValue(row.getCell(c)).trim().replace(" ", "").replace("-", "").toLowerCase();
-                            for (String p : periodKeys) {
-                                String cleanP = p.replace(" ", "").replace("-", "").toLowerCase();
-                                if (txt.equals(cleanP)) {
-                                    if (row.getLastCellNum() > 12 && row.getCell(12) != null) {
-                                        columnMNetMap.put(p, getCachedNumeric(row.getCell(12)));
-                                    }
-                                    if (row.getLastCellNum() > 10 && row.getCell(10) != null) {
-                                        double kVal = getCachedNumeric(row.getCell(10));
-                                        if (kVal > 0) incomeVatMap.put(p, kVal);
-                                    }
-                                    if (row.getLastCellNum() > 11 && row.getCell(11) != null) {
-                                        double lVal = getCachedNumeric(row.getCell(11));
-                                        if (lVal > 0) claimVatMap.put(p, lVal);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                org.apache.poi.ss.usermodel.Sheet carSheet = wb.getSheet("Car Purchase & Sales");
-                if (carSheet != null) {
-                    int lastCarRow = carSheet.getLastRowNum();
-                    for (int r = 1; r <= lastCarRow; r++) {
-                        Row row = carSheet.getRow(r);
-                        if (row == null) continue;
-
-                        double vat = getCachedNumeric(row.getCell(9));
-                        if (vat <= 0.001) continue;
-
-                        String periodStr = row.getCell(12) != null ? formatter.formatCellValue(row.getCell(12)).trim() : "";
-                        String saleDateStr = row.getCell(5) != null ? formatter.formatCellValue(row.getCell(5)).trim() : "";
-
-                        String matchedPeriod = null;
-
-                        if (!periodStr.isEmpty()) {
-                            String cleanColM = periodStr.replace(" ", "").replace("-", "").toLowerCase();
-                            for (String p : periodKeys) {
-                                if (cleanColM.contains(p.replace(" ", "").replace("-", "").toLowerCase())) {
-                                    matchedPeriod = p;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (matchedPeriod == null && !saleDateStr.isEmpty()) {
-                            LocalDate sDate = parseFlexibleDate(saleDateStr);
-                            if (sDate.getYear() > 1970) {
-                                matchedPeriod = getBimonthlyPeriodFromDate(sDate);
-                            }
-                        }
-
-                        if (matchedPeriod != null && incomeVatMap.containsKey(matchedPeriod)) {
-                            incomeVatMap.put(matchedPeriod, incomeVatMap.get(matchedPeriod) + vat);
-                        }
-                    }
-                }
-
-                String[] expenseTabs = {"Parts", "NCT", "Consumables", "Overheads", "Tool Purchases"};
-                for (String tabName : expenseTabs) {
-                    org.apache.poi.ss.usermodel.Sheet expSheet = wb.getSheet(tabName);
-                    if (expSheet == null) continue;
-
-                    int lastRow = expSheet.getLastRowNum();
-                    for (int r = 1; r <= lastRow; r++) {
-                        Row row = expSheet.getRow(r);
-                        if (row == null) continue;
-
-                        double vat = getCachedNumeric(row.getCell(7));
-                        if (vat <= 0.001) continue;
-
-                        String periodStr = row.getCell(9) != null ? formatter.formatCellValue(row.getCell(9)).trim() : "";
-                        String dateStr = row.getCell(0) != null ? formatter.formatCellValue(row.getCell(0)).trim() : "";
-
-                        String matchedPeriod = null;
-
-                        if (!periodStr.isEmpty()) {
-                            String cleanP = periodStr.replace(" ", "").replace("-", "").toLowerCase();
-                            for (String p : periodKeys) {
-                                if (cleanP.contains(p.replace(" ", "").replace("-", "").toLowerCase())) {
-                                    matchedPeriod = p;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (matchedPeriod == null && !dateStr.isEmpty()) {
-                            LocalDate d = parseFlexibleDate(dateStr);
-                            if (d.getYear() > 1970) {
-                                matchedPeriod = getBimonthlyPeriodFromDate(d);
-                            }
-                        }
-
-                        if (matchedPeriod != null && claimVatMap.containsKey(matchedPeriod)) {
-                            claimVatMap.put(matchedPeriod, claimVatMap.get(matchedPeriod) + vat);
-                        }
-                    }
-                }
-
-                ObservableList<VatPeriodSummary> summaryRows = FXCollections.observableArrayList();
-                for (String p : periodKeys) {
-                    double t1 = incomeVatMap.get(p);
-                    double t2 = claimVatMap.get(p);
-                    double net = columnMNetMap.get(p) != null ? columnMNetMap.get(p) : (t1 - t2);
-
-                    summaryRows.add(new VatPeriodSummary(p, t1, t2, net));
-                }
-
-                Platform.runLater(() -> {
-                    vatTableView.setItems(summaryRows);
-                    log("VAT Returns table loaded.");
-                });
-
-            } catch (Exception ex) {
-                log("Error reading VAT Returns: " + ex.getMessage());
-            }
-        }).start();
-    }
-
-    private String getBimonthlyPeriodFromDate(LocalDate date) {
-        int m = date.getMonthValue();
-        switch ((m + 1) / 2) {
-            case 1: return "Jan - Feb";
-            case 2: return "Mar - Apr";
-            case 3: return "May - Jun";
-            case 4: return "Jul - Aug";
-            case 5: return "Sep - Oct";
-            case 6: return "Nov - Dec";
-            default: return "Jan - Feb";
-        }
-    }
-
-    private LocalDate parseFlexibleDate(String str) {
-        if (str == null || str.trim().isEmpty()) return LocalDate.of(1970, 1, 1);
-        str = str.trim();
-        try {
-            return LocalDate.parse(str);
-        } catch (Exception e1) {
-            try {
-                DateTimeFormatter dtf = new DateTimeFormatterBuilder()
-                        .parseCaseInsensitive()
-                        .appendPattern("d-MMM-yyyy")
-                        .toFormatter(Locale.ENGLISH);
-                return LocalDate.parse(str, dtf);
-            } catch (Exception e2) {
-                try {
-                    return LocalDate.parse(str, EU_UI_FORMATTER);
-                } catch (Exception e3) {
-                    return LocalDate.of(1970, 1, 1);
-                }
-            }
-        }
-    }
-
-    private double getCachedNumeric(org.apache.poi.ss.usermodel.Cell cell) {
-        if (cell == null) return 0.0;
-        try {
-            if (cell.getCellType() == CellType.NUMERIC) {
-                return cell.getNumericCellValue();
-            } else if (cell.getCellType() == CellType.FORMULA) {
-                if (cell.getCachedFormulaResultType() == CellType.NUMERIC) {
-                    return cell.getNumericCellValue();
-                } else if (cell.getCachedFormulaResultType() == CellType.STRING) {
-                    String s = cell.getStringCellValue().trim().replace("€", "").replace(",", "");
-                    return s.isEmpty() ? 0.0 : Double.parseDouble(s);
-                }
-            } else if (cell.getCellType() == CellType.STRING) {
-                String s = cell.getStringCellValue().trim().replace("€", "").replace(",", "");
-                return s.isEmpty() ? 0.0 : Double.parseDouble(s);
-            }
-        } catch (Exception ignored) {}
-        return 0.0;
-    }
-
-    // =========================================================================
-    // 3. MARKET VALUATION GUIDE (WITH DIRECT ACTIVE LISTING LINKS)
-    // =========================================================================
-    public static class MarketListing {
-        private final SimpleStringProperty title;
-        private final SimpleStringProperty price;
-        private final SimpleStringProperty year;
-        private final SimpleStringProperty location;
-        private final String adUrl;
-
-        public MarketListing(String title, double price, String year, String location, String adUrl) {
-            this.title = new SimpleStringProperty(title);
-            this.price = new SimpleStringProperty(String.format("€%,.0f", price));
-            this.year = new SimpleStringProperty(year);
-            this.location = new SimpleStringProperty(location != null && !location.isEmpty() ? location : "Ireland");
-            this.adUrl = adUrl;
-        }
-
-        public String getTitle() { return title.get(); }
-        public String getPrice() { return price.get(); }
-        public String getYear() { return year.get(); }
-        public String getLocation() { return location.get(); }
-        public String getAdUrl() { return adUrl; }
-    }
-
-    public static class CachedMarketData {
-        public String fetchDate;
-        public double dealerHigh;
-        public double marketAvg;
-        public double tradeLow;
-        public List<CachedListingItem> listings = new ArrayList<>();
-    }
-
-    public static class CachedListingItem {
-        public String title;
-        public double price;
-        public String year;
-        public String location;
-        public String adUrl;
-
-        public CachedListingItem() {}
-        public CachedListingItem(String title, double price, String year, String location, String adUrl) {
-            this.title = title;
-            this.price = price;
-            this.year = year;
-            this.location = location;
-            this.adUrl = adUrl;
-        }
-    }
-
-    private VBox createValuationView() {
-        VBox card = new VBox(14);
-        card.getStyleClass().add("card-panel");
-
-        Label title = new Label("Irish Market Valuation Guide (DoneDeal Live & 30-Day Cache)");
-        title.getStyleClass().add("section-header");
-
-        Label subtitle = new Label("On-demand valuation engine for Volkswagen, Ford, Nissan, and Peugeot. Results are cached locally for 30 days. Double-click any advert or click 'View Ad' to inspect it online.");
-        subtitle.setStyle("-fx-text-fill: #64748B; -fx-font-size: 12px;");
-
-        ComboBox<String> makeBox = new ComboBox<>();
-        makeBox.getItems().addAll("Volkswagen", "Ford", "Nissan", "Peugeot");
-        makeBox.setValue("Nissan");
-
-        ComboBox<String> modelBox = new ComboBox<>();
-        Runnable populateModels = () -> {
-            String selectedMake = makeBox.getValue();
-            modelBox.getItems().clear();
-            if ("Volkswagen".equals(selectedMake)) {
-                modelBox.getItems().addAll("Golf", "Passat", "Polo", "Tiguan", "Caddy");
-                modelBox.setValue("Golf");
-            } else if ("Ford".equals(selectedMake)) {
-                modelBox.getItems().addAll("Focus", "Fiesta", "Mondeo", "Kuga", "Transit Connect");
-                modelBox.setValue("Focus");
-            } else if ("Peugeot".equals(selectedMake)) {
-                modelBox.getItems().addAll("208", "308", "2008", "3008", "5008", "508");
-                modelBox.setValue("3008");
-            } else {
-                modelBox.getItems().addAll("Qashqai", "Juke", "Micra", "X-Trail", "Note");
-                modelBox.setValue("Qashqai");
-            }
-        };
-        makeBox.valueProperty().addListener((obs, o, n) -> populateModels.run());
-        populateModels.run();
-
-        ComboBox<Integer> yearBox = new ComboBox<>();
-        for (int y = 2026; y >= 2006; y--) {
-            yearBox.getItems().add(y);
-        }
-        yearBox.setValue(2011);
-
-        Button searchBtn = new Button("🔍 Check Live Market / Load Cache");
-        searchBtn.getStyleClass().add("btn-primary");
-
-        Button forceRefreshBtn = new Button("⚡ Force Fresh Live Scan");
-        forceRefreshBtn.getStyleClass().add("btn-secondary");
-
-        HBox filterRow = new HBox(12,
-                new VBox(4, new Label("Make:"), makeBox),
-                new VBox(4, new Label("Model:"), modelBox),
-                new VBox(4, new Label("Year:"), yearBox),
-                new VBox(4, new Label(" "), searchBtn),
-                new VBox(4, new Label(" "), forceRefreshBtn)
-        );
-        filterRow.setAlignment(Pos.BOTTOM_LEFT);
-
-        VBox box1 = new VBox(4);
-        box1.getStyleClass().add("stat-box-green");
-        box1.setAlignment(Pos.CENTER);
-        Label t1 = new Label("DEALER / RETAIL GUIDE (MINT)"); t1.getStyleClass().add("stat-title"); t1.setStyle("-fx-text-fill: #15803D;");
-        valDealerHigh = new Label("€0.00"); valDealerHigh.getStyleClass().add("stat-value"); valDealerHigh.setStyle("-fx-text-fill: #064E3B;");
-        Label s1 = new Label("Clean Condition / Long NCT (85th %ile)"); s1.getStyleClass().add("stat-sub");
-        box1.getChildren().addAll(t1, valDealerHigh, s1);
-        HBox.setHgrow(box1, Priority.ALWAYS);
-
-        VBox box2 = new VBox(4);
-        box2.getStyleClass().add("stat-box-blue");
-        box2.setAlignment(Pos.CENTER);
-        Label t2 = new Label("MARKET AVERAGE GUIDE"); t2.getStyleClass().add("stat-title"); t2.setStyle("-fx-text-fill: #1D4ED8;");
-        valMarketAvg = new Label("€0.00"); valMarketAvg.getStyleClass().add("stat-value"); valMarketAvg.setStyle("-fx-text-fill: #1E3A8A;");
-        Label s2 = new Label("Typical Private / Forecourt Asking Price"); s2.getStyleClass().add("stat-sub");
-        box2.getChildren().addAll(t2, valMarketAvg, s2);
-        HBox.setHgrow(box2, Priority.ALWAYS);
-
-        VBox box3 = new VBox(4);
-        box3.getStyleClass().add("stat-box-yellow");
-        box3.setAlignment(Pos.CENTER);
-        Label t3 = new Label("TRADE / BUY TARGET (PROJECT)"); t3.getStyleClass().add("stat-title"); t3.setStyle("-fx-text-fill: #B45309;");
-        valTradeLow = new Label("€0.00"); valTradeLow.getStyleClass().add("stat-value"); valTradeLow.setStyle("-fx-text-fill: #78350F;");
-        Label s3 = new Label("Needs Work / Short NCT / Buy In (15th %ile)"); s3.getStyleClass().add("stat-sub");
-        box3.getChildren().addAll(t3, valTradeLow, s3);
-        HBox.setHgrow(box3, Priority.ALWAYS);
-
-        HBox statsRow = new HBox(12, box1, box2, box3);
-
-        valCacheStatus = new Label("Status: Ready to search. No queries run yet.");
-        valCacheStatus.setStyle("-fx-font-size: 11px; -fx-text-fill: #475569; -fx-font-style: italic;");
-
-        marketTableView = new TableView<>();
-        marketTableView.setPrefHeight(320);
-        marketTableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-
-        TableColumn<MarketListing, String> colTitle = new TableColumn<>("Advert Title");
-        colTitle.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getTitle()));
-        colTitle.setPrefWidth(330);
-
-        TableColumn<MarketListing, String> colYr = new TableColumn<>("Year");
-        colYr.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getYear()));
-        colYr.setPrefWidth(55);
-        colYr.setStyle("-fx-alignment: CENTER;");
-
-        TableColumn<MarketListing, String> colPrice = new TableColumn<>("Asking Price");
-        colPrice.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPrice()));
-        colPrice.setPrefWidth(90);
-        colPrice.setStyle("-fx-alignment: CENTER-RIGHT; -fx-font-weight: bold; -fx-text-fill: #0F172A;");
-
-        TableColumn<MarketListing, String> colLoc = new TableColumn<>("Location");
-        colLoc.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getLocation()));
-        colLoc.setPrefWidth(110);
-
-        TableColumn<MarketListing, Void> colLink = new TableColumn<>("Advert Link");
-        colLink.setPrefWidth(95);
-        colLink.setCellFactory(param -> new TableCell<>() {
-            private final Button btn = new Button("View Ad ↗");
-            {
-                btn.setStyle("-fx-background-color: #0284C7; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 3 8; -fx-background-radius: 4; -fx-cursor: hand;");
-                btn.setOnAction(e -> {
-                    MarketListing listing = getTableView().getItems().get(getIndex());
-                    if (listing != null && listing.getAdUrl() != null && !listing.getAdUrl().isEmpty()) {
-                        openBrowser(listing.getAdUrl());
-                    }
-                });
-            }
-
-            @Override
-            protected void updateItem(Void item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty) {
-                    setGraphic(null);
-                } else {
-                    MarketListing listing = getTableView().getItems().get(getIndex());
-                    if (listing != null && listing.getAdUrl() != null && !listing.getAdUrl().isEmpty()) {
-                        setGraphic(btn);
-                        setAlignment(Pos.CENTER);
-                    } else {
-                        setGraphic(null);
-                    }
-                }
-            }
-        });
-
-        marketTableView.getColumns().addAll(colTitle, colYr, colPrice, colLoc, colLink);
-
-        marketTableView.setRowFactory(tv -> {
-            TableRow<MarketListing> row = new TableRow<>();
-            row.setOnMouseClicked(event -> {
-                if (event.getClickCount() == 2 && (!row.isEmpty())) {
-                    MarketListing selected = row.getItem();
-                    if (selected != null && selected.getAdUrl() != null && !selected.getAdUrl().isEmpty()) {
-                        openBrowser(selected.getAdUrl());
-                    }
-                }
+            const response = await fetch('https://www.donedeal.ie/search/api/v4/find/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    section: "cars",
+                    adType: "forsale",
+                    sort: "relevance desc",
+                    max: 25,
+                    words: `${make} ${model} ${year}`
+                })
             });
-            return row;
-        });
 
-        searchBtn.setOnAction(e -> executeMarketSearch(makeBox.getValue(), modelBox.getValue(), yearBox.getValue(), false));
-        forceRefreshBtn.setOnAction(e -> executeMarketSearch(makeBox.getValue(), modelBox.getValue(), yearBox.getValue(), true));
+            if (!response.ok) throw new Error("Network response failed");
 
-        card.getChildren().addAll(title, subtitle, filterRow, statsRow, valCacheStatus, marketTableView);
-        return card;
-    }
+            const data = await response.json();
+            const ads = data.ads || [];
 
-    private void executeMarketSearch(String make, String model, int year, boolean forceFresh) {
-        String cacheKey = (make + "_" + model + "_" + year).toLowerCase();
+            let prices = [];
+            let htmlContent = "";
 
-        if (!forceFresh) {
-            CachedMarketData cached = loadFromLocalCache(cacheKey);
-            if (cached != null) {
-                LocalDate cachedDate = LocalDate.parse(cached.fetchDate);
-                long daysOld = ChronoUnit.DAYS.between(cachedDate, LocalDate.now());
-                if (daysOld < 30) {
-                    displayValuationResults(cached.dealerHigh, cached.marketAvg, cached.tradeLow, cached.listings,
-                            String.format("Loaded from 30-Day Cache (%d days old — Fetched %s)", daysOld, cached.fetchDate));
-                    log("Valuation for " + year + " " + make + " " + model + " loaded from local cache.");
-                    return;
-                }
-            }
-        }
+            ads.forEach(ad => {
+                let price = parseFloat((ad.price || "0").toString().replace(/[^0-9.]/g, ''));
+                if (price >= 400) prices.push(price);
 
-        valCacheStatus.setText("Querying live market index for " + year + " " + make + " " + model + "...");
+                let title = ad.header || `${make} ${model}`;
+                let county = ad.county || "Ireland";
+                let adId = ad.id || "";
+                let url = ad.friendlyUrl ? (ad.friendlyUrl.startsWith("http") ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`) : `https://www.donedeal.ie/cars-for-sale/view/${adId}`;
 
-        new Thread(() -> {
-            try {
-                List<CachedListingItem> fetchedListings = fetchMarketListingsDirect(make, model, year);
+                htmlContent += `
+                    <div class="listing-item">
+                        <div class="listing-info">
+                            <div class="listing-title">${title}</div>
+                            <div class="listing-meta">${county}</div>
+                            <a href="${url}" target="_blank" class="btn-view">View Ad ↗</a>
+                        </div>
+                        <div class="listing-price">€${price.toLocaleString()}</div>
+                    </div>
+                `;
+            });
 
-                if (fetchedListings.isEmpty()) {
-                    Platform.runLater(() -> {
-                        valCacheStatus.setText("No active listings found for " + year + " " + make + " " + model + ".");
-                        showAlert(Alert.AlertType.INFORMATION, "No comparable listings found for " + year + " " + make + " " + model);
-                    });
-                    return;
-                }
+            if (prices.length > 0) {
+                prices.sort((a,b) => a - b);
+                let low = prices[Math.floor(prices.length * 0.15)];
+                let avg = prices[Math.floor(prices.length * 0.50)];
+                let high = prices[Math.floor(prices.length * 0.85)];
 
-                List<Double> prices = new ArrayList<>();
-                for (CachedListingItem item : fetchedListings) {
-                    if (item.price >= 400.0) {
-                        prices.add(item.price);
-                    }
-                }
-                Collections.sort(prices);
-
-                if (prices.isEmpty()) {
-                    Platform.runLater(() -> valCacheStatus.setText("Only scrap/outlier vehicles returned."));
-                    return;
-                }
-
-                double lowP = getPercentile(prices, 15);
-                double medP = getPercentile(prices, 50);
-                double highP = getPercentile(prices, 85);
-
-                CachedMarketData data = new CachedMarketData();
-                data.fetchDate = LocalDate.now().toString();
-                data.dealerHigh = highP;
-                data.marketAvg = medP;
-                data.tradeLow = lowP;
-                data.listings = fetchedListings;
-                saveToLocalCache(cacheKey, data);
-
-                Platform.runLater(() -> {
-                    displayValuationResults(highP, medP, lowP, fetchedListings,
-                            String.format("Live Market Guide Updated (%d active cars found — Saved to 30-Day Cache).", prices.size()));
-                    log("SUCCESS: Fetched " + prices.size() + " comparable cars for " + year + " " + make + " " + model);
-                });
-
-            } catch (Exception ex) {
-                Platform.runLater(() -> {
-                    valCacheStatus.setText("Live fetch note: " + ex.getMessage());
-                    log("Market query error: " + ex.getMessage());
-                });
-            }
-        }).start();
-    }
-
-    private List<CachedListingItem> fetchMarketListingsDirect(String make, String model, int year) throws Exception {
-        List<CachedListingItem> items = new ArrayList<>();
-
-        java.net.URL url = new java.net.URL("https://www.donedeal.ie/search/api/v4/find/");
-        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setConnectTimeout(8000);
-        conn.setReadTimeout(8000);
-        conn.setDoOutput(true);
-
-        conn.setRequestProperty("User-Agent", "DoneDeal/6.24.0 (Android; 14; Mobile; Google Pixel)");
-        conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-        conn.setRequestProperty("X-Client-Platform", "android");
-        conn.setRequestProperty("X-Client-Version", "6.24.0");
-
-        String jsonPayload = String.format(
-                "{\"section\":\"cars\",\"adType\":\"forsale\",\"sort\":\"relevance desc\",\"max\":30,\"start\":0," +
-                        "\"words\":\"%s %s %d\"}",
-                make, model, year
-        );
-
-        try (java.io.OutputStream os = conn.getOutputStream()) {
-            os.write(jsonPayload.getBytes(StandardCharsets.UTF_8));
-        }
-
-        int code = conn.getResponseCode();
-
-        if (code == 200) {
-            try (java.io.Reader r = new java.io.InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8)) {
-                com.google.gson.JsonObject root = new Gson().fromJson(r, com.google.gson.JsonObject.class);
-                if (root.has("ads") && root.get("ads").isJsonArray()) {
-                    for (com.google.gson.JsonElement el : root.getAsJsonArray("ads")) {
-                        if (!el.isJsonObject()) continue;
-                        com.google.gson.JsonObject ad = el.getAsJsonObject();
-
-                        String title = ad.has("header") ? ad.get("header").getAsString() : (make + " " + model);
-                        String priceStr = ad.has("price") ? ad.get("price").getAsString() : "0";
-                        String location = ad.has("county") ? ad.get("county").getAsString() : "Ireland";
-
-                        String adId = ad.has("id") ? ad.get("id").getAsString() : "";
-                        String adUrl = "";
-                        if (ad.has("friendlyUrl") && !ad.get("friendlyUrl").getAsString().isEmpty()) {
-                            String fUrl = ad.get("friendlyUrl").getAsString().trim();
-                            if (fUrl.startsWith("http://") || fUrl.startsWith("https://")) {
-                                adUrl = fUrl;
-                            } else if (fUrl.startsWith("/")) {
-                                adUrl = "https://www.donedeal.ie" + fUrl;
-                            } else {
-                                adUrl = "https://www.donedeal.ie/cars/" + fUrl + "/" + adId;
-                            }
-                        } else if (!adId.isEmpty()) {
-                            adUrl = "https://www.donedeal.ie/cars-for-sale/view/" + adId;
-                        }
-
-                        double p = 0.0;
-                        try {
-                            p = Double.parseDouble(priceStr.replaceAll("[^0-9.]", ""));
-                        } catch (Exception ignored) {}
-
-                        if (p >= 400.0) {
-                            items.add(new CachedListingItem(title, p, String.valueOf(year), location, adUrl));
-                        }
-                    }
-                }
-            }
-        } else {
-            items = fetchViaSystemCurl(make, model, year);
-        }
-
-        items.sort((a, b) -> Double.compare(b.price, a.price));
-        return items;
-    }
-
-    private List<CachedListingItem> fetchViaSystemCurl(String make, String model, int year) {
-        List<CachedListingItem> items = new ArrayList<>();
-        try {
-            String payload = String.format(
-                    "{\"section\":\"cars\",\"adType\":\"forsale\",\"sort\":\"relevance desc\",\"max\":30,\"start\":0,\"words\":\"%s %s %d\"}",
-                    make, model, year
-            );
-
-            ProcessBuilder pb = new ProcessBuilder(
-                    "curl.exe", "-s", "-X", "POST",
-                    "https://www.donedeal.ie/search/api/v4/find/",
-                    "-H", "User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36",
-                    "-H", "Content-Type: application/json",
-                    "-H", "Accept: application/json",
-                    "-d", payload
-            );
-
-            Process process = pb.start();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                com.google.gson.JsonObject root = new Gson().fromJson(reader, com.google.gson.JsonObject.class);
-                if (root != null && root.has("ads") && root.get("ads").isJsonArray()) {
-                    for (com.google.gson.JsonElement el : root.getAsJsonArray("ads")) {
-                        if (!el.isJsonObject()) continue;
-                        com.google.gson.JsonObject ad = el.getAsJsonObject();
-                        String title = ad.has("header") ? ad.get("header").getAsString() : (make + " " + model);
-                        String priceStr = ad.has("price") ? ad.get("price").getAsString() : "0";
-                        String location = ad.has("county") ? ad.get("county").getAsString() : "Ireland";
-
-                        String adId = ad.has("id") ? ad.get("id").getAsString() : "";
-                        String adUrl = "";
-                        if (ad.has("friendlyUrl") && !ad.get("friendlyUrl").getAsString().isEmpty()) {
-                            String fUrl = ad.get("friendlyUrl").getAsString().trim();
-                            if (fUrl.startsWith("http://") || fUrl.startsWith("https://")) {
-                                adUrl = fUrl;
-                            } else if (fUrl.startsWith("/")) {
-                                adUrl = "https://www.donedeal.ie" + fUrl;
-                            } else {
-                                adUrl = "https://www.donedeal.ie/cars/" + fUrl + "/" + adId;
-                            }
-                        } else if (!adId.isEmpty()) {
-                            adUrl = "https://www.donedeal.ie/cars-for-sale/view/" + adId;
-                        }
-
-                        double p = 0.0;
-                        try {
-                            p = Double.parseDouble(priceStr.replaceAll("[^0-9.]", ""));
-                        } catch (Exception ignored) {}
-
-                        if (p >= 400.0) {
-                            items.add(new CachedListingItem(title, p, String.valueOf(year), location, adUrl));
-                        }
-                    }
-                }
-            }
-        } catch (Exception ignored) {}
-        return items;
-    }
-
-    private void openBrowser(String url) {
-        if (url == null || url.trim().isEmpty()) return;
-        try {
-            if (java.awt.Desktop.isDesktopSupported() && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE)) {
-                java.awt.Desktop.getDesktop().browse(new URI(url));
+                document.getElementById("valHigh").textContent = `€${Math.round(high).toLocaleString()}`;
+                document.getElementById("valAvg").textContent = `€${Math.round(avg).toLocaleString()}`;
+                document.getElementById("valLow").textContent = `€${Math.round(low).toLocaleString()}`;
+                statusEl.textContent = `Found ${prices.length} active listings.`;
+                container.innerHTML = htmlContent;
             } else {
-                new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", url).start();
+                statusEl.textContent = "No comparable listings found for this selection.";
             }
-        } catch (Exception ex) {
-            log("Error opening advert link: " + ex.getMessage());
+
+        } catch (err) {
+            statusEl.textContent = "Live lookup blocked by browser security (CORS). Use desktop app for direct scans.";
         }
     }
-
-    private void displayValuationResults(double high, double avg, double low, List<CachedListingItem> items, String statusText) {
-        valDealerHigh.setText(String.format("€%,.0f", high));
-        valMarketAvg.setText(String.format("€%,.0f", avg));
-        valTradeLow.setText(String.format("€%,.0f", low));
-        valCacheStatus.setText(statusText);
-
-        ObservableList<MarketListing> tableRows = FXCollections.observableArrayList();
-        for (CachedListingItem item : items) {
-            tableRows.add(new MarketListing(item.title, item.price, item.year, item.location, item.adUrl));
-        }
-        marketTableView.setItems(tableRows);
-    }
-
-    private double getPercentile(List<Double> sortedList, double percentile) {
-        if (sortedList.isEmpty()) return 0.0;
-        int index = (int) Math.round((percentile / 100.0) * (sortedList.size() - 1));
-        index = Math.max(0, Math.min(index, sortedList.size() - 1));
-        return sortedList.get(index);
-    }
-
-    private synchronized CachedMarketData loadFromLocalCache(String key) {
-        java.io.File file = new java.io.File(MARKET_CACHE_PATH);
-        if (!file.exists()) return null;
-
-        try (Reader reader = new FileReader(file, StandardCharsets.UTF_8)) {
-            Type type = new TypeToken<Map<String, CachedMarketData>>() {}.getType();
-            Map<String, CachedMarketData> map = new Gson().fromJson(reader, type);
-            if (map != null && map.containsKey(key)) {
-                return map.get(key);
-            }
-        } catch (Exception ignored) {}
-        return null;
-    }
-
-    private synchronized void saveToLocalCache(String key, CachedMarketData data) {
-        Map<String, CachedMarketData> map = new HashMap<>();
-        java.io.File file = new java.io.File(MARKET_CACHE_PATH);
-
-        if (file.exists()) {
-            try (Reader reader = new FileReader(file, StandardCharsets.UTF_8)) {
-                Type type = new TypeToken<Map<String, CachedMarketData>>() {}.getType();
-                Map<String, CachedMarketData> existing = new Gson().fromJson(reader, type);
-                if (existing != null) map.putAll(existing);
-            } catch (Exception ignored) {}
-        }
-
-        map.put(key, data);
-
-        try (Writer writer = new FileWriter(file, StandardCharsets.UTF_8)) {
-            new Gson().toJson(map, writer);
-        } catch (Exception ignored) {}
-    }
-
-    // ==========================================
-    // 4. CAR VIEW + STATUTORY MARGIN INVOICE PDF
-    // ==========================================
-    private VBox createCarView(Stage stage) {
-        VBox card = new VBox(16);
-        card.getStyleClass().add("card-panel");
-
-        Label title = new Label("Vehicle Acquisition, Margin Entry & Invoice Generator");
-        title.getStyleClass().add("section-header");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(16);
-        grid.setVgap(12);
-
-        TextField regField = new TextField();
-        regField.setPromptText("e.g. 09-G-14522");
-        TextField modelField = new TextField();
-        modelField.setPromptText("e.g. Nissan Qashqai 1.5 dCi");
-        DatePicker purchDateField = new DatePicker(LocalDate.now());
-        purchDateField.setConverter(createEuDateConverter());
-        purchDateField.setPromptText("DD/MM/YYYY");
-        TextField purchPriceField = new TextField();
-        purchPriceField.setPromptText("0.00");
-        TextField prepCostField = new TextField("0.00");
-        DatePicker saleDateField = new DatePicker();
-        saleDateField.setConverter(createEuDateConverter());
-        saleDateField.setPromptText("DD/MM/YYYY");
-        TextField salePriceField = new TextField();
-        salePriceField.setPromptText("0.00");
-
-        TextField buyerNameField = new TextField();
-        buyerNameField.setPromptText("e.g. John Doe");
-        TextField buyerAddressField = new TextField();
-        buyerAddressField.setPromptText("e.g. Tuam, Co. Galway");
-
-        Label marginVatLabel = new Label("Margin VAT Due: €0.00");
-        marginVatLabel.getStyleClass().add("badge-vat");
-
-        Label netProfitLabel = new Label("Net Profit After VAT: €0.00");
-        netProfitLabel.getStyleClass().add("badge-profit");
-
-        Runnable recalculate = () -> {
-            try {
-                double purch = purchPriceField.getText().isBlank() ? 0.0 : Double.parseDouble(purchPriceField.getText().trim());
-                double prep = prepCostField.getText().isBlank() ? 0.0 : Double.parseDouble(prepCostField.getText().trim());
-                double sale = salePriceField.getText().isBlank() ? 0.0 : Double.parseDouble(salePriceField.getText().trim());
-
-                if (sale > purch && purch > 0) {
-                    double taxableMargin = sale - purch;
-                    double marginVat = Math.round(taxableMargin * (23.0 / 123.0) * 100.0) / 100.0;
-                    double netProfit = (sale - purch - prep) - marginVat;
-
-                    marginVatLabel.setText(String.format("Margin VAT Due: €%.2f", marginVat));
-                    netProfitLabel.setText(String.format("Net Profit After VAT: €%.2f", netProfit));
-                } else {
-                    marginVatLabel.setText("Margin VAT Due: €0.00");
-                    netProfitLabel.setText(String.format("Net Margin: €%.2f", (sale - purch - prep)));
-                }
-            } catch (NumberFormatException ignored) {}
-        };
-
-        purchPriceField.textProperty().addListener((obs, o, n) -> recalculate.run());
-        prepCostField.textProperty().addListener((obs, o, n) -> recalculate.run());
-        salePriceField.textProperty().addListener((obs, o, n) -> recalculate.run());
-
-        Label l0 = new Label("Registration / Stock ID:"); l0.getStyleClass().add("field-label");
-        Label l1 = new Label("Make & Model:");           l1.getStyleClass().add("field-label");
-        Label l2 = new Label("Purchase Date:");          l2.getStyleClass().add("field-label");
-        Label l3 = new Label("Purchase Price (€):");     l3.getStyleClass().add("field-label");
-        Label l4 = new Label("Allocated Prep/Parts (€):"); l4.getStyleClass().add("field-label");
-        Label l5 = new Label("Sale Date (Optional):");   l5.getStyleClass().add("field-label");
-        Label l6 = new Label("Selling Price (€):");      l6.getStyleClass().add("field-label");
-        Label l7 = new Label("Buyer Name (for Invoice):"); l7.getStyleClass().add("field-label");
-        Label l8 = new Label("Buyer Address / Town:");   l8.getStyleClass().add("field-label");
-
-        grid.add(l0, 0, 0); grid.add(regField, 1, 0);
-        grid.add(l1, 0, 1); grid.add(modelField, 1, 1);
-        grid.add(l2, 0, 2); grid.add(purchDateField, 1, 2);
-        grid.add(l3, 0, 3); grid.add(purchPriceField, 1, 3);
-        grid.add(l4, 0, 4); grid.add(prepCostField, 1, 4);
-        grid.add(l5, 0, 5); grid.add(saleDateField, 1, 5);
-        grid.add(l6, 0, 6); grid.add(salePriceField, 1, 6);
-        grid.add(l7, 0, 7); grid.add(buyerNameField, 1, 7);
-        grid.add(l8, 0, 8); grid.add(buyerAddressField, 1, 8);
-
-        HBox badges = new HBox(12, marginVatLabel, netProfitLabel);
-
-        Button saveCarBtn = new Button("💾 Save Vehicle Instantly to Google Sheets");
-        saveCarBtn.getStyleClass().add("btn-primary");
-
-        saveCarBtn.setOnAction(e -> {
-            String reg = regField.getText().trim();
-            String model = modelField.getText().trim();
-            LocalDate pDate = purchDateField.getValue();
-            String pPrice = purchPriceField.getText().trim();
-            String prep = prepCostField.getText().trim();
-            LocalDate sDate = saleDateField.getValue();
-            String sPrice = salePriceField.getText().trim();
-
-            if (reg.isEmpty() || pPrice.isEmpty()) {
-                showAlert(Alert.AlertType.ERROR, "Please enter Registration and Purchase Price.");
-                return;
-            }
-
-            saveCarBtn.setDisable(true);
-
-            new Thread(() -> {
-                try {
-                    double dPurch = Double.parseDouble(pPrice);
-                    double dPrep = prep.isEmpty() ? 0.0 : Double.parseDouble(prep);
-                    Double dSale = sPrice.isEmpty() ? null : Double.parseDouble(sPrice);
-
-                    log("Writing car directly to Google Sheets...");
-                    appendVehicleDirectToSheets(reg, model, pDate, dPurch, dPrep, sDate, dSale);
-                    log("SUCCESS: Cloud save & chronological sort confirmed.");
-
-                    Platform.runLater(() -> {
-                        saveCarBtn.setDisable(false);
-                        showAlert(Alert.AlertType.INFORMATION, "Vehicle saved and sorted chronologically!");
-                    });
-
-                    pullFullWorkbookFromDrive();
-                    loadMasterSheetData();
-                    loadVatReturnsData();
-
-                } catch (Exception ex) {
-                    log("ERROR: " + ex.getMessage());
-                    Platform.runLater(() -> {
-                        saveCarBtn.setDisable(false);
-                        showAlert(Alert.AlertType.ERROR, "Save Failed: " + ex.getMessage());
-                    });
-                }
-            }).start();
-        });
-
-        Button invoiceBtn = new Button("📄 Generate Margin Scheme Sales Invoice (PDF)");
-        invoiceBtn.getStyleClass().add("btn-success");
-
-        invoiceBtn.setOnAction(e -> {
-            String reg = regField.getText().trim();
-            String model = modelField.getText().trim();
-            String sPrice = salePriceField.getText().trim();
-            String buyer = buyerNameField.getText().trim();
-            String address = buyerAddressField.getText().trim();
-            LocalDate sDate = saleDateField.getValue() != null ? saleDateField.getValue() : LocalDate.now();
-
-            if (reg.isEmpty() || model.isEmpty() || sPrice.isEmpty()) {
-                showAlert(Alert.AlertType.ERROR, "Please ensure Registration, Make/Model, and Selling Price are entered.");
-                return;
-            }
-
-            FileChooser fileChooser = new FileChooser();
-            fileChooser.setTitle("Save Margin Scheme Invoice PDF");
-            fileChooser.setInitialFileName("Invoice_" + reg.replaceAll("[^a-zA-Z0-9]", "_") + ".pdf");
-            fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Documents", "*.pdf"));
-            java.io.File destFile = fileChooser.showSaveDialog(stage);
-
-            if (destFile != null) {
-                try {
-                    generateMarginSchemeInvoicePdf(destFile, reg, model, Double.parseDouble(sPrice), sDate, buyer, address);
-                    showAlert(Alert.AlertType.INFORMATION, "Statutory Margin Scheme invoice created successfully:\n" + destFile.getAbsolutePath());
-                } catch (Exception ex) {
-                    showAlert(Alert.AlertType.ERROR, "Failed to create invoice: " + ex.getMessage());
-                }
-            }
-        });
-
-        HBox btnRow = new HBox(12, saveCarBtn, invoiceBtn);
-        card.getChildren().addAll(title, grid, badges, btnRow);
-        return card;
-    }
-
-    private void generateMarginSchemeInvoicePdf(java.io.File targetFile, String reg, String model, double price,
-                                                LocalDate saleDate, String buyer, String address) throws Exception {
-        try (PDDocument doc = new PDDocument()) {
-            PDPage page = new PDPage(PDRectangle.A4);
-            doc.addPage(page);
-
-            try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
-                cs.beginText();
-                cs.setFont(PDType1Font.HELVETICA_BOLD, 20);
-                cs.newLineAtOffset(50, 780);
-                cs.showText("PJ MOTOR TRADE");
-                cs.endText();
-
-                cs.beginText();
-                cs.setFont(PDType1Font.HELVETICA, 10);
-                cs.newLineAtOffset(50, 764);
-                cs.showText("Mountbellew, Co. Galway | Revenue Registered Dealer");
-                cs.endText();
-
-                cs.beginText();
-                cs.setFont(PDType1Font.HELVETICA_BOLD, 14);
-                cs.newLineAtOffset(400, 780);
-                cs.showText("SALES INVOICE");
-                cs.endText();
-
-                cs.beginText();
-                cs.setFont(PDType1Font.HELVETICA, 10);
-                cs.newLineAtOffset(400, 764);
-                cs.showText("Date: " + saleDate.format(DISPLAY_DATE_FMT));
-                cs.newLineAtOffset(0, -14);
-                cs.showText("Invoice No: PJ-" + saleDate.getYear() + "-" + Math.abs(reg.hashCode() % 10000));
-                cs.endText();
-
-                cs.setLineWidth(1.0f);
-                cs.moveTo(50, 735);
-                cs.lineTo(550, 735);
-                cs.stroke();
-
-                cs.beginText();
-                cs.setFont(PDType1Font.HELVETICA_BOLD, 11);
-                cs.newLineAtOffset(50, 705);
-                cs.showText("SOLD TO:");
-                cs.setFont(PDType1Font.HELVETICA, 11);
-                cs.newLineAtOffset(0, -16);
-                cs.showText(buyer.isEmpty() ? "Private Customer" : buyer);
-                if (!address.isEmpty()) {
-                    cs.newLineAtOffset(0, -14);
-                    cs.showText(address);
-                }
-                cs.endText();
-
-                cs.setLineWidth(0.5f);
-                cs.moveTo(50, 630);
-                cs.lineTo(550, 630);
-                cs.moveTo(50, 608);
-                cs.lineTo(550, 608);
-                cs.stroke();
-
-                cs.beginText();
-                cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
-                cs.newLineAtOffset(55, 615);
-                cs.showText("ITEM DESCRIPTION / VEHICLE SPECIFICATION");
-                cs.newLineAtOffset(400, 0);
-                cs.showText("AMOUNT (€)");
-                cs.endText();
-
-                cs.beginText();
-                cs.setFont(PDType1Font.HELVETICA, 11);
-                cs.newLineAtOffset(55, 590);
-                cs.showText(model.toUpperCase() + " (Reg: " + reg.toUpperCase() + ")");
-                cs.newLineAtOffset(400, 0);
-                cs.showText(String.format("€%,.2f", price));
-                cs.endText();
-
-                cs.setLineWidth(0.5f);
-                cs.moveTo(50, 560);
-                cs.lineTo(550, 560);
-                cs.moveTo(50, 535);
-                cs.lineTo(550, 535);
-                cs.stroke();
-
-                cs.beginText();
-                cs.setFont(PDType1Font.HELVETICA_BOLD, 12);
-                cs.newLineAtOffset(320, 542);
-                cs.showText("TOTAL AMOUNT DUE:");
-                cs.newLineAtOffset(135, 0);
-                cs.showText(String.format("€%,.2f", price));
-                cs.endText();
-
-                cs.beginText();
-                cs.setFont(PDType1Font.HELVETICA_BOLD, 9);
-                cs.newLineAtOffset(50, 460);
-                cs.showText("STATUTORY REVENUE COMPLIANCE NOTICE:");
-                cs.setFont(PDType1Font.HELVETICA_OBLIQUE, 9);
-                cs.newLineAtOffset(0, -14);
-                cs.showText("Special Scheme – Auctioneers / Margin Scheme – Second-Hand Goods.");
-                cs.newLineAtOffset(0, -12);
-                cs.showText("This vehicle is sold under the Irish Revenue Special Margin Scheme for Second-Hand Goods.");
-                cs.newLineAtOffset(0, -12);
-                cs.showText("In accordance with Section 87 of VATCA 2010, VAT is not shown separately on this invoice and");
-                cs.newLineAtOffset(0, -12);
-                cs.showText("the purchaser is not entitled to claim an input tax deduction in respect of this purchase.");
-                cs.endText();
-
-                cs.beginText();
-                cs.setFont(PDType1Font.HELVETICA, 10);
-                cs.newLineAtOffset(50, 320);
-                cs.showText("Authorized Signature: _______________________________________");
-                cs.newLineAtOffset(0, -25);
-                cs.showText("Thank you for your custom.");
-                cs.endText();
-            }
-
-            doc.save(targetFile);
-        }
-    }
-
-    // ==========================================
-    // 5. FAST EXPENSE ENTRY + DUPLICATE & SORT
-    // ==========================================
-    private VBox createExpenseView() {
-        VBox card = new VBox(16);
-        card.getStyleClass().add("card-panel");
-
-        Label title = new Label("Overhead & Expense Logging");
-        title.getStyleClass().add("section-header");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(16);
-        grid.setVgap(12);
-
-        DatePicker dateField = new DatePicker(LocalDate.now());
-        dateField.setConverter(createEuDateConverter());
-        dateField.setPromptText("DD/MM/YYYY");
-        TextField carRegField = new TextField();
-        carRegField.setPromptText("Optional (e.g. 152G1697)");
-
-        ComboBox<String> categoryBox = new ComboBox<>();
-        categoryBox.getItems().addAll("Parts", "NCT", "Consumables", "Overheads", "Tool Purchases");
-        categoryBox.setValue("Parts");
-
-        TextField supplierField = new TextField();
-        supplierField.setPromptText("e.g. Kellys");
-        TextField refField = new TextField();
-        refField.setPromptText("e.g. INV-10492");
-
-        Label duplicateWarning = new Label("");
-        duplicateWarning.setStyle("-fx-text-fill: #DC2626; -fx-font-weight: bold; -fx-font-size: 11px;");
-
-        Runnable checkDuplicate = () -> {
-            String refInput = refField.getText().trim().toLowerCase();
-            String supInput = supplierField.getText().trim().toLowerCase();
-            if (refInput.length() < 2) {
-                duplicateWarning.setText("");
-                return;
-            }
-
-            new Thread(() -> {
-                boolean foundMatch = false;
-                java.io.File file = new java.io.File(LOCAL_EXCEL_PATH);
-                if (!file.exists()) return;
-
-                String[] expenseTabs = {"Parts", "NCT", "Consumables", "Overheads", "Tool Purchases"};
-                try (org.apache.poi.ss.usermodel.Workbook wb = new XSSFWorkbook(new FileInputStream(file))) {
-                    DataFormatter formatter = new DataFormatter();
-                    for (String tabName : expenseTabs) {
-                        org.apache.poi.ss.usermodel.Sheet sheet = wb.getSheet(tabName);
-                        if (sheet == null) continue;
-
-                        for (int r = 1; r <= sheet.getLastRowNum(); r++) {
-                            Row row = sheet.getRow(r);
-                            if (row == null) continue;
-
-                            String existingSup = formatter.formatCellValue(row.getCell(1)).trim().toLowerCase();
-                            String existingRef = formatter.formatCellValue(row.getCell(2)).trim().toLowerCase();
-
-                            if (existingRef.equals(refInput)) {
-                                if (supInput.isEmpty() || existingSup.contains(supInput) || supInput.contains(existingSup)) {
-                                    foundMatch = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (foundMatch) break;
-                    }
-                } catch (Exception ignored) {}
-
-                final boolean match = foundMatch;
-                Platform.runLater(() -> {
-                    if (match) {
-                        duplicateWarning.setText("⚠️ WARNING: Invoice reference '" + refField.getText() + "' already logged in ledger!");
-                    } else {
-                        duplicateWarning.setText("");
-                    }
-                });
-            }).start();
-        };
-
-        refField.textProperty().addListener((obs, o, n) -> checkDuplicate.run());
-        supplierField.textProperty().addListener((obs, o, n) -> checkDuplicate.run());
-
-        TextField descField = new TextField();
-        descField.setPromptText("e.g. Brake discs");
-        TextField grossField = new TextField();
-        grossField.setPromptText("0.00");
-
-        ComboBox<String> vatRateBox = new ComboBox<>();
-        vatRateBox.getItems().addAll("23% (Standard)", "13.5% (Electricity/Reduced)", "0% (Insurance/Exempt)");
-        vatRateBox.setValue("23% (Standard)");
-
-        Label netLabel = new Label("Net Cost: €0.00");
-        netLabel.getStyleClass().add("badge-vat");
-
-        Label vatLabel = new Label("Reclaimable VAT: €0.00");
-        vatLabel.getStyleClass().add("badge-profit");
-
-        Runnable calcExpense = () -> {
-            try {
-                double gross = grossField.getText().isBlank() ? 0.0 : Double.parseDouble(grossField.getText().trim());
-                double rate = vatRateBox.getValue().startsWith("23") ? 0.23 : (vatRateBox.getValue().startsWith("13.5") ? 0.135 : 0.0);
-                double net = Math.round((gross / (1.0 + rate)) * 100.0) / 100.0;
-                double vat = Math.round((gross - net) * 100.0) / 100.0;
-
-                netLabel.setText(String.format("Net Cost: €%.2f", net));
-                vatLabel.setText(String.format("Reclaimable VAT: €%.2f", vat));
-            } catch (NumberFormatException ignored) {}
-        };
-
-        grossField.textProperty().addListener((obs, o, n) -> calcExpense.run());
-        vatRateBox.valueProperty().addListener((obs, o, n) -> calcExpense.run());
-
-        Label l0 = new Label("Date:");                      l0.getStyleClass().add("field-label");
-        Label l1 = new Label("Car Reg / Stock ID:");        l1.getStyleClass().add("field-label");
-        Label l2 = new Label("Category:");                  l2.getStyleClass().add("field-label");
-        Label l3 = new Label("Supplier / Vendor:");         l3.getStyleClass().add("field-label");
-        Label l4 = new Label("Invoice / Receipt Ref:");      l4.getStyleClass().add("field-label");
-        Label l5 = new Label("Description:");               l5.getStyleClass().add("field-label");
-        Label l6 = new Label("Gross Total Paid (€):");      l6.getStyleClass().add("field-label");
-        Label l7 = new Label("VAT Rate:");                  l7.getStyleClass().add("field-label");
-
-        grid.add(l0, 0, 0); grid.add(dateField, 1, 0);
-        grid.add(l1, 0, 1); grid.add(carRegField, 1, 1);
-        grid.add(l2, 0, 2); grid.add(categoryBox, 1, 2);
-        grid.add(l3, 0, 3); grid.add(supplierField, 1, 3);
-        grid.add(l4, 0, 4); grid.add(refField, 1, 4);
-        grid.add(new Label(""), 0, 5); grid.add(duplicateWarning, 1, 5);
-        grid.add(l5, 0, 6); grid.add(descField, 1, 6);
-        grid.add(l6, 0, 7); grid.add(grossField, 1, 7);
-        grid.add(l7, 0, 8); grid.add(vatRateBox, 1, 8);
-
-        HBox badges = new HBox(12, netLabel, vatLabel);
-
-        Button saveExpBtn = new Button("💾 Record Expense Instantly to Google Sheets");
-        saveExpBtn.getStyleClass().add("btn-primary");
-
-        saveExpBtn.setOnAction(e -> {
-            String grossText = grossField.getText().trim();
-            if (grossText.isEmpty()) {
-                showAlert(Alert.AlertType.ERROR, "Please enter Gross Total Paid.");
-                return;
-            }
-
-            String cat = categoryBox.getValue();
-            LocalDate d = dateField.getValue();
-            String reg = carRegField.getText().trim();
-            String sup = supplierField.getText().trim();
-            String ref = refField.getText().trim();
-            String desc = descField.getText().trim();
-            double gross = Double.parseDouble(grossText);
-            double rate = vatRateBox.getValue().startsWith("23") ? 0.23 : (vatRateBox.getValue().startsWith("13.5") ? 0.135 : 0.0);
-
-            saveExpBtn.setDisable(true);
-
-            new Thread(() -> {
-                try {
-                    log("Writing expense directly to Google Sheets (" + cat + ")...");
-                    appendExpenseDirectToSheets(cat, d, reg, sup, ref, desc, gross, rate);
-                    log("SUCCESS: Cloud save & chronological sort confirmed.");
-
-                    Platform.runLater(() -> {
-                        saveExpBtn.setDisable(false);
-                        showAlert(Alert.AlertType.INFORMATION, "Expense recorded and sorted chronologically!");
-                        carRegField.clear(); supplierField.clear(); refField.clear(); descField.clear(); grossField.clear();
-                    });
-
-                    pullFullWorkbookFromDrive();
-                    loadMasterSheetData();
-                    loadVatReturnsData();
-
-                } catch (Exception ex) {
-                    log("ERROR: " + ex.getMessage());
-                    Platform.runLater(() -> {
-                        saveExpBtn.setDisable(false);
-                        showAlert(Alert.AlertType.ERROR, "Save Failed: " + ex.getMessage());
-                    });
-                }
-            }).start();
-        });
-
-        card.getChildren().addAll(title, grid, badges, saveExpBtn);
-        return card;
-    }
-
-    private VBox createSyncView() {
-        VBox card = new VBox(16);
-        card.getStyleClass().add("card-panel");
-
-        Button pullBtn = new Button("📥 Pull & Refresh Full Ledger from Google Drive");
-        pullBtn.getStyleClass().add("btn-primary");
-
-        pullBtn.setOnAction(e -> {
-            new Thread(() -> {
-                try {
-                    log("Exporting and syncing latest workbook from Google...");
-                    pullFullWorkbookFromDrive();
-                    loadMasterSheetData();
-                    loadVatReturnsData();
-                    Platform.runLater(() -> showAlert(Alert.AlertType.INFORMATION, "Local ledger refreshed from Google."));
-                } catch (Exception ex) {
-                    log("ERROR: " + ex.getMessage());
-                    Platform.runLater(() -> showAlert(Alert.AlertType.ERROR, "Pull Failed: " + ex.getMessage()));
-                }
-            }).start();
-        });
-
-        logArea = new TextArea();
-        logArea.setEditable(false);
-        logArea.getStyleClass().add("terminal-log");
-        logArea.setPrefHeight(340);
-
-        Label logLabel = new Label("Drive & Sheets Activity Console:");
-        logLabel.getStyleClass().add("field-label");
-
-        card.getChildren().addAll(pullBtn, logLabel, logArea);
-        return card;
-    }
-
-    // ==========================================
-    // DIRECT GOOGLE SHEETS API & SORTING ENGINE
-    // ==========================================
-    private Sheets getSheetsService() throws Exception {
-        NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
-        Credential credential = getCredentials(httpTransport);
-        return new Sheets.Builder(httpTransport, JSON_FACTORY, credential)
-                .setApplicationName("PJ Motor Trade Accounts")
-                .build();
-    }
-
-    private synchronized void sortSheetByDate(Sheets service, String sheetName) {
-        try {
-            com.google.api.services.sheets.v4.model.Spreadsheet spreadsheet =
-                    service.spreadsheets().get(SPREADSHEET_ID).execute();
-
-            Integer numericSheetId = null;
-            for (com.google.api.services.sheets.v4.model.Sheet sheet : spreadsheet.getSheets()) {
-                if (sheet.getProperties().getTitle().equalsIgnoreCase(sheetName)) {
-                    numericSheetId = sheet.getProperties().getSheetId();
-                    break;
-                }
-            }
-            if (numericSheetId == null) return;
-
-            SortRangeRequest sortRequest = new SortRangeRequest()
-                    .setRange(new GridRange()
-                            .setSheetId(numericSheetId)
-                            .setStartRowIndex(1)
-                            .setStartColumnIndex(0)
-                            .setEndColumnIndex(12))
-                    .setSortSpecs(Collections.singletonList(
-                            new SortSpec()
-                                    .setDimensionIndex(0) // Column A (Date)
-                                    .setSortOrder("ASCENDING")
-                    ));
-
-            BatchUpdateSpreadsheetRequest body = new BatchUpdateSpreadsheetRequest()
-                    .setRequests(Collections.singletonList(
-                            new Request().setSortRange(sortRequest)
-                    ));
-
-            service.spreadsheets().batchUpdate(SPREADSHEET_ID, body).execute();
-        } catch (Exception ignored) {}
-    }
-
-    private synchronized void appendVehicleDirectToSheets(String reg, String model, LocalDate pDate, double pPrice,
-                                                          double prep, LocalDate sDate, Double sPrice) throws Exception {
-        Sheets service = getSheetsService();
-        String sheetName = "Car Purchase & Sales";
-
-        ValueRange response = service.spreadsheets().values()
-                .get(SPREADSHEET_ID, sheetName + "!A:A")
-                .execute();
-        int nextRow = (response.getValues() != null) ? response.getValues().size() + 1 : 2;
-
-        List<Object> rowData = new ArrayList<>();
-        rowData.add(reg);
-        rowData.add(model);
-        rowData.add(pDate.format(DISPLAY_DATE_FMT));
-        rowData.add(pPrice);
-        rowData.add(prep);
-        rowData.add(sDate != null ? sDate.format(DISPLAY_DATE_FMT) : "");
-        rowData.add(sPrice != null ? sPrice : "");
-
-        rowData.add("=IF(OR(ISBLANK(G" + nextRow + "), G" + nextRow + "=0), 0, G" + nextRow + "-D" + nextRow + "-E" + nextRow + ")");
-        rowData.add("=IF(OR(ISBLANK(G" + nextRow + "), G" + nextRow + "=0), 0, MAX(0, G" + nextRow + "-D" + nextRow + "))");
-        rowData.add("=ROUND(I" + nextRow + "*(23/123), 2)");
-        rowData.add("=IF(OR(ISBLANK(G" + nextRow + "), G" + nextRow + "=0), 0, H" + nextRow + "-J" + nextRow + ")");
-        rowData.add("=IF(ISBLANK(F" + nextRow + "), \"\", TEXT(DATEVALUE(F" + nextRow + "), \"mmmm yyyy\"))");
-        rowData.add("=IF(ISBLANK(F" + nextRow + "), \"\", CHOOSE(ROUNDUP(MONTH(DATEVALUE(F" + nextRow + "))/2, 0), \"Jan - Feb\", \"Mar - Apr\", \"May - Jun\", \"Jul - Aug\", \"Sep - Oct\", \"Nov - Dec\"))");
-
-        ValueRange appendBody = new ValueRange().setValues(Collections.singletonList(rowData));
-        service.spreadsheets().values()
-                .append(SPREADSHEET_ID, sheetName + "!A" + nextRow, appendBody)
-                .setValueInputOption("USER_ENTERED")
-                .execute();
-
-        sortSheetByDate(service, sheetName);
-    }
-
-    private synchronized void appendExpenseDirectToSheets(String tabName, LocalDate date, String carReg, String supplier,
-                                                          String ref, String desc, double gross, double rate) throws Exception {
-        Sheets service = getSheetsService();
-
-        ValueRange response = service.spreadsheets().values()
-                .get(SPREADSHEET_ID, tabName + "!A:A")
-                .execute();
-        int nextRow = (response.getValues() != null) ? response.getValues().size() + 1 : 2;
-
-        double net = Math.round((gross / (1.0 + rate)) * 100.0) / 100.0;
-
-        List<Object> rowData = new ArrayList<>(Collections.nCopies(12, ""));
-        rowData.set(0, date.format(DISPLAY_DATE_FMT)); // Col A: Date
-        rowData.set(1, supplier != null ? supplier : ""); // Col B: Supplier / Vendor
-        rowData.set(2, ref != null ? ref : "");        // Col C: Invoice / Receipt #
-        rowData.set(3, desc != null ? desc : "");      // Col D: Description
-        rowData.set(4, net);                           // Col E: Net Amount (€)
-        rowData.set(5, gross);                         // Col F: Gross Total Paid (€)
-
-        if (tabName.equalsIgnoreCase("Overheads")) {
-            rowData.set(6, "=IF(OR(ISBLANK(F" + nextRow + "), F" + nextRow + "=0), 0, ROUND(F" + nextRow + "-(F" + nextRow + "/(1+" + rate + ")), 2))"); // Col G: Reclaimable VAT
-            rowData.set(7, "=IF(ISBLANK(A" + nextRow + "), \"\", TEXT(DATEVALUE(A" + nextRow + "), \"mmmm yyyy\"))"); // Col H: Month
-            rowData.set(8, "=IF(ISBLANK(A" + nextRow + "), \"\", CHOOSE(ROUNDUP(MONTH(DATEVALUE(A" + nextRow + "))/2, 0), \"Jan - Feb\", \"Mar - Apr\", \"May - Jun\", \"Jul - Aug\", \"Sep - Oct\", \"Nov - Dec\"))"); // Col I: Period
-        } else {
-            rowData.set(6, "=IF(AND(F" + nextRow + ">0, E" + nextRow + ">0), ROUND(F" + nextRow + "-E" + nextRow + ", 2), 0)"); // Col G: VAT
-            rowData.set(7, "=IF(ISBLANK(A" + nextRow + "), \"\", TEXT(DATEVALUE(A" + nextRow + "), \"mmmm yyyy\"))"); // Col H: Month
-            rowData.set(8, "=IF(ISBLANK(A" + nextRow + "), \"\", CHOOSE(ROUNDUP(MONTH(DATEVALUE(A" + nextRow + "))/2, 0), \"Jan - Feb\", \"Mar - Apr\", \"May - Jun\", \"Jul - Aug\", \"Sep - Oct\", \"Nov - Dec\"))"); // Col I: Period
-        }
-
-        ValueRange appendBody = new ValueRange().setValues(Collections.singletonList(rowData));
-        service.spreadsheets().values()
-                .append(SPREADSHEET_ID, tabName + "!A" + nextRow, appendBody)
-                .setValueInputOption("USER_ENTERED")
-                .execute();
-
-        sortSheetByDate(service, tabName);
-    }
-
-    private void pullFullWorkbookFromDrive() throws Exception {
-        createLocalWorkbookBackup();
-
-        NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
-        Credential credential = getCredentials(httpTransport);
-        Drive service = new Drive.Builder(httpTransport, JSON_FACTORY, credential)
-                .setApplicationName("PJ Motor Trade Accounts")
-                .build();
-
-        java.io.File localFile = new java.io.File(LOCAL_EXCEL_PATH);
-        try (OutputStream out = new FileOutputStream(localFile)) {
-            service.files().export(
-                    SPREADSHEET_ID,
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            ).executeMediaAndDownloadTo(out);
-        }
-    }
-
-    private void createLocalWorkbookBackup() {
-        try {
-            java.io.File src = new java.io.File(LOCAL_EXCEL_PATH);
-            if (src.exists()) {
-                java.io.File backupDir = new java.io.File("backups");
-                if (!backupDir.exists()) backupDir.mkdirs();
-
-                String ts = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss").format(LocalDateTime.now());
-                java.io.File dest = new java.io.File(backupDir, "PJ_Accounts_Backup_" + ts + ".xlsx");
-                Files.copy(src.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                log("Local safety snapshot created in backups/" + dest.getName());
-            }
-        } catch (Exception ignored) {}
-    }
-
-    private Credential getCredentials(NetHttpTransport httpTransport) throws IOException {
-        InputStream in = MotorTradeApp.class.getResourceAsStream("/credentials.json");
-        if (in == null) {
-            java.io.File localCred = new java.io.File("credentials.json");
-            if (localCred.exists()) {
-                in = new FileInputStream(localCred);
-            } else {
-                throw new FileNotFoundException("credentials.json not found in resources or app folder.");
-            }
-        }
-        GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
-
-        GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-                httpTransport, JSON_FACTORY, clientSecrets, SCOPES)
-                .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
-                .setAccessType("offline")
-                .build();
-
-        LocalServerReceiver receiver = new LocalServerReceiver.Builder().setPort(-1).build();
-        return new AuthorizationCodeInstalledApp(flow, receiver).authorize("user");
-    }
-
-    private void log(String msg) {
-        Platform.runLater(() -> {
-            if (logArea != null) {
-                logArea.appendText("[" + LocalDate.now().format(DISPLAY_DATE_FMT) + "] " + msg + "\n");
-            }
-        });
-    }
-
-    private void showAlert(Alert.AlertType type, String message) {
-        Alert alert = new Alert(type, message);
-        alert.show();
-    }
-
-    public static void main(String[] args) {
-        launch(args);
-    }
-}
+</script>
+</body>
+</html>
