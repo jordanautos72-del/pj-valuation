@@ -104,7 +104,7 @@
 <body>
 <div class="container">
     <div class="card">
-        <h2>Irish Market Valuation & Adverts</h2>
+        <h2>Irish Market Valuation</h2>
         <div class="form-group">
             <label>Make</label>
             <select id="makeSelect" onchange="updateModels()">
@@ -122,7 +122,7 @@
             <label>Year</label>
             <select id="yearSelect"></select>
         </div>
-        <button class="btn-search" onclick="fetchMarket()">Scan Active Adverts</button>
+        <button class="btn-search" onclick="fetchMarket()">Check Live Market</button>
     </div>
 
     <div class="stats-grid">
@@ -140,7 +140,7 @@
         </div>
     </div>
 
-    <div id="status">Select vehicle specifications and tap scan.</div>
+    <div id="status">Select make, model, and year above to search.</div>
     <div id="listingsContainer"></div>
 </div>
 
@@ -182,31 +182,25 @@
         const statusEl = document.getElementById("status");
         const container = document.getElementById("listingsContainer");
 
-        statusEl.textContent = `Scanning active listings for ${year} ${make} ${model}...`;
+        statusEl.textContent = `Scanning live market for ${year} ${make} ${model}...`;
         container.innerHTML = "";
 
-        const payload = {
-            section: "cars",
-            adType: "forsale",
-            sort: "relevance desc",
-            max: 25,
-            words: `${make} ${model} ${year}`
-        };
-
-        // Utilizing a stable JSON translation proxy route to return listing feeds securely
-        const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://www.donedeal.ie/search/api/v4/find/');
-
         try {
-            const response = await fetch(proxyUrl, {
+            const response = await fetch('https://www.donedeal.ie/search/api/v4/find/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    section: "cars",
+                    adType: "forsale",
+                    sort: "relevance desc",
+                    max: 25,
+                    words: `${make} ${model} ${year}`
+                })
             });
 
-            if (!response.ok) throw new Error("Connection failed");
+            if (!response.ok) throw new Error("Network response failed");
 
-            const wrapper = await response.json();
-            const data = JSON.parse(wrapper.contents);
+            const data = await response.json();
             const ads = data.ads || [];
 
             let prices = [];
@@ -242,14 +236,14 @@
                 document.getElementById("valHigh").textContent = `€${Math.round(high).toLocaleString()}`;
                 document.getElementById("valAvg").textContent = `€${Math.round(avg).toLocaleString()}`;
                 document.getElementById("valLow").textContent = `€${Math.round(low).toLocaleString()}`;
-                statusEl.textContent = `Successfully loaded ${prices.length} active adverts.`;
+                statusEl.textContent = `Found ${prices.length} active listings.`;
                 container.innerHTML = htmlContent;
             } else {
-                statusEl.textContent = "No active adverts found for this specific filter.";
+                statusEl.textContent = "No comparable listings found for this selection.";
             }
 
         } catch (err) {
-            statusEl.textContent = "Live feed currently protected. Tap scan again to retry.";
+            statusEl.textContent = "Live lookup blocked by browser security (CORS). Use desktop app for direct scans.";
         }
     }
 </script>
