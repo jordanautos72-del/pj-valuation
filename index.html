@@ -145,7 +145,8 @@
         }
         .listing-info { flex: 1; padding-right: 10px; }
         .listing-title { font-size: 13px; font-weight: 700; color: #0F172A; margin-bottom: 3px; }
-        .listing-meta { font-size: 11px; color: #64748B; }
+        .listing-meta { font-size: 11px; color: #64748B; display: flex; gap: 8px; align-items: center; }
+        .year-badge { background: #E2E8F0; color: #334155; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 10px; }
         .listing-price-col { text-align: right; }
         .listing-price { font-size: 15px; font-weight: 800; color: #0284C7; margin-bottom: 4px; }
         .btn-view {
@@ -376,8 +377,19 @@
                         adUrl = `https://www.donedeal.ie/${currentSection}-for-sale/view/${ad.id}`;
                     }
 
+                    // Extract year from title or attributes
+                    let adYear = yearFrom;
+                    const titleText = ad.header || `${make} ${model}`;
+                    const yearMatch = titleText.match(/\b(20[0-2][0-9])\b/);
+                    if (yearMatch) {
+                        adYear = yearMatch[1];
+                    } else if (ad.year) {
+                        adYear = ad.year;
+                    }
+
                     listings.push({
-                        title: ad.header || `${make} ${model}`,
+                        title: titleText,
+                        year: adYear,
                         price: priceNum,
                         location: ad.county || 'Ireland',
                         url: adUrl
@@ -424,7 +436,10 @@
                 div.innerHTML = `
                     <div class="listing-info">
                         <div class="listing-title">${item.title}</div>
-                        <div class="listing-meta">📍 ${item.location}</div>
+                        <div class="listing-meta">
+                            <span class="year-badge">${item.year}</span>
+                            <span>📍 ${item.location}</span>
+                        </div>
                     </div>
                     <div class="listing-price-col">
                         <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
