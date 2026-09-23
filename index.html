@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PJ Market Valuation</title>
+    <title>PJ Market Valuation & Salvage Guide</title>
     <meta name="theme-color" content="#0F172A">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -26,9 +26,33 @@
             align-items: center;
             justify-content: space-between;
         }
-        .header h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
+        .header h1 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
         .header span { font-size: 11px; color: #38BDF8; font-weight: bold; }
         
+        .nav-tabs {
+            display: flex;
+            background: #1E293B;
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 14px;
+        }
+        .nav-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            color: #94A3B8;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+        }
+        .nav-tab.active {
+            background: #FFFFFF;
+            color: #0F172A;
+        }
+
         .card {
             background: #FFFFFF;
             border-radius: 12px;
@@ -151,7 +175,12 @@
 
     <div class="header">
         <h1>PJ MARKET VALUATION</h1>
-        <span>DoneDeal Live</span>
+        <span id="modeTitle">Standard Valuation</span>
+    </div>
+
+    <div class="nav-tabs">
+        <button class="nav-tab active" id="tabStandard" onclick="switchMode('cars')">Standard Valuation</button>
+        <button class="nav-tab" id="tabSalvage" onclick="switchMode('damagedcars')">Damaged / Salvage</button>
     </div>
 
     <div class="card">
@@ -182,7 +211,7 @@
         </div>
 
         <div class="btn-row">
-            <button class="btn-primary" onclick="lookupVehicle(false)">🔍 Check Valuation</button>
+            <button class="btn-primary" onclick="lookupVehicle(false)">🔍 Check Market</button>
             <button class="btn-sec" onclick="lookupVehicle(true)" title="Force fresh scrape">⚡ Live</button>
         </div>
     </div>
@@ -190,34 +219,36 @@
     <div class="kpi-container">
         <div class="kpi kpi-green">
             <div>
-                <div class="kpi-title">DEALER / RETAIL (MINT)</div>
-                <div class="kpi-sub">Clean NCT / Forecourt Guide</div>
+                <div class="kpi-title" id="lblHigh">DEALER / RETAIL (MINT)</div>
+                <div class="kpi-sub" id="subHigh">Clean NCT / Forecourt Guide</div>
             </div>
-            <div class="kpi-val" id="dealerHigh">€0</div>
+            <div class="kpi-val" id="statHigh">€0</div>
         </div>
 
         <div class="kpi kpi-blue">
             <div>
-                <div class="kpi-title">MARKET AVERAGE</div>
-                <div class="kpi-sub">Typical Asking Price</div>
+                <div class="kpi-title" id="lblAvg">MARKET AVERAGE</div>
+                <div class="kpi-sub" id="subAvg">Typical Asking Price</div>
             </div>
-            <div class="kpi-val" id="marketAvg">€0</div>
+            <div class="kpi-val" id="statAvg">€0</div>
         </div>
 
         <div class="kpi kpi-yellow">
             <div>
-                <div class="kpi-title">TRADE / BUY TARGET</div>
-                <div class="kpi-sub">Short NCT / Prep Project</div>
+                <div class="kpi-title" id="lblLow">TRADE / BUY TARGET</div>
+                <div class="kpi-sub" id="subLow">Short NCT / Prep Project</div>
             </div>
-            <div class="kpi-val" id="tradeLow">€0</div>
+            <div class="kpi-val" id="statLow">€0</div>
         </div>
     </div>
 
-    <div class="status-bar" id="statusBar">Ready. Select vehicle and tap Check Valuation.</div>
+    <div class="status-bar" id="statusBar">Ready. Select vehicle and tap Check Market.</div>
 
     <div id="listingsList"></div>
 
     <script>
+        let currentSection = 'cars';
+
         const models = {
             'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note'],
             'Ford': ['Focus', 'Fiesta', 'Mondeo', 'Kuga', 'Transit Connect'],
@@ -256,6 +287,31 @@
             });
         }
 
+        function switchMode(section) {
+            currentSection = section;
+            document.getElementById('tabStandard').className = section === 'cars' ? 'nav-tab active' : 'nav-tab';
+            document.getElementById('tabSalvage').className = section === 'damagedcars' ? 'nav-tab active' : 'nav-tab';
+            document.getElementById('modeTitle').innerText = section === 'cars' ? 'Standard Valuation' : 'Damaged / Salvage';
+
+            if (section === 'damagedcars') {
+                document.getElementById('lblHigh').innerText = 'HIGHEST SALVAGE ASKING';
+                document.getElementById('subHigh').innerText = 'Minor Damage / High Spec';
+                document.getElementById('lblAvg').innerText = 'AVERAGE REPAIRABLE ASKING';
+                document.getElementById('subAvg').innerText = 'Median Salvage Price';
+                document.getElementById('lblLow').innerText = 'LOWEST SALVAGE BUY-IN';
+                document.getElementById('subLow').innerText = 'Bottom 15th %ile Target';
+            } else {
+                document.getElementById('lblHigh').innerText = 'DEALER / RETAIL (MINT)';
+                document.getElementById('subHigh').innerText = 'Clean NCT / Forecourt Guide';
+                document.getElementById('lblAvg').innerText = 'MARKET AVERAGE';
+                document.getElementById('subAvg').innerText = 'Typical Asking Price';
+                document.getElementById('lblLow').innerText = 'TRADE / BUY TARGET';
+                document.getElementById('subLow').innerText = 'Short NCT / Prep Project';
+            }
+            document.getElementById('statusBar').innerText = `Switched to ${section === 'cars' ? 'Standard Valuation' : 'Damaged / Salvage'}. Ready.`;
+            document.getElementById('listingsList').innerHTML = '';
+        }
+
         function getPercentile(arr, p) {
             if (arr.length === 0) return 0;
             const idx = Math.min(Math.floor((p / 100) * arr.length), arr.length - 1);
@@ -267,7 +323,7 @@
             const model = document.getElementById('modelSelect').value;
             const yearFrom = document.getElementById('yearFromSelect').value;
             const yearTo = document.getElementById('yearToSelect').value;
-            const cacheKey = `${make}_${model}_${yearFrom}_${yearTo}`.toLowerCase();
+            const cacheKey = `${currentSection}_${make}_${model}_${yearFrom}_${yearTo}`.toLowerCase();
             const status = document.getElementById('statusBar');
 
             if (!forceFresh) {
@@ -277,20 +333,19 @@
                         const data = JSON.parse(cached);
                         const daysOld = Math.floor((new Date() - new Date(data.date)) / (1000 * 60 * 60 * 24));
                         if (daysOld < 30) {
-                            renderResults(data.dealerHigh, data.marketAvg, data.tradeLow, data.listings);
-                            status.innerText = `Loaded from 30-Day Cache (${daysOld}d old — Saved ${data.date})`;
+                            renderResults(data.high, data.avg, data.low, data.listings);
+                            status.innerText = `Loaded from Cache (${daysOld}d old)`;
                             return;
                         }
                     } catch (e) {}
                 }
             }
 
-            status.innerText = `Querying live DoneDeal market index for ${yearFrom}-${yearTo} ${make} ${model}...`;
+            status.innerText = `Querying live DoneDeal ${currentSection === 'damagedcars' ? 'Salvage' : 'Standard'} market...`;
 
-            const workerUrl = `https://pj-val-proxy.pauljordanie.workers.dev/?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
+            const workerUrl = `https://pj-val-proxy.pauljordanie.workers.dev/?section=${currentSection}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
 
             let data = null;
-
             try {
                 const res = await fetch(workerUrl);
                 if (res.ok) data = await res.json();
@@ -298,16 +353,14 @@
                 console.error(err);
             }
 
-            const searchLink = `https://www.donedeal.ie/cars/${make.toLowerCase()}/${model.toLowerCase().replace(' ', '-')}?year_from=${yearFrom}&year_to=${yearTo}`;
-
             if (!data || !data.ads || data.ads.length === 0) {
-                status.innerHTML = `Could not load listings via worker bridge.<br>` +
-                    `<a href="${searchLink}" target="_blank" class="action-link">Open ${yearFrom}-${yearTo} ${make} ${model} on DoneDeal ↗</a>`;
+                status.innerText = `No listings returned via worker bridge.`;
                 return;
             }
 
             let listings = [];
             let prices = [];
+            const minP = currentSection === 'damagedcars' ? 150 : 400;
 
             data.ads.forEach(ad => {
                 let priceNum = 0;
@@ -315,12 +368,12 @@
                     priceNum = parseFloat(ad.price.replace(/[^0-9.]/g, '')) || 0;
                 }
 
-                if (priceNum >= 400) {
+                if (priceNum >= minP) {
                     let adUrl = '';
                     if (ad.friendlyUrl && ad.friendlyUrl.length > 0) {
                         adUrl = ad.friendlyUrl.startsWith('http') ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`;
                     } else if (ad.id) {
-                        adUrl = `https://www.donedeal.ie/cars-for-sale/view/${ad.id}`;
+                        adUrl = `https://www.donedeal.ie/${currentSection}-for-sale/view/${ad.id}`;
                     }
 
                     listings.push({
@@ -345,20 +398,20 @@
 
             localStorage.setItem(cacheKey, JSON.stringify({
                 date: new Date().toISOString().split('T')[0],
-                dealerHigh: high,
-                marketAvg: avg,
-                tradeLow: low,
+                high: high,
+                avg: avg,
+                low: low,
                 listings: listings
             }));
 
             renderResults(high, avg, low, listings);
-            status.innerText = `Live market valuation updated (${prices.length} comparable cars found).`;
+            status.innerText = `Market guide updated (${prices.length} vehicles found).`;
         }
 
         function renderResults(high, avg, low, items) {
-            document.getElementById('dealerHigh').innerText = '€' + Math.round(high).toLocaleString();
-            document.getElementById('marketAvg').innerText = '€' + Math.round(avg).toLocaleString();
-            document.getElementById('tradeLow').innerText = '€' + Math.round(low).toLocaleString();
+            document.getElementById('statHigh').innerText = '€' + Math.round(high).toLocaleString();
+            document.getElementById('statAvg').innerText = '€' + Math.round(avg).toLocaleString();
+            document.getElementById('statLow').innerText = '€' + Math.round(low).toLocaleString();
 
             const container = document.getElementById('listingsList');
             container.innerHTML = '';
