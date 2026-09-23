@@ -43,7 +43,7 @@
         }
         select, button {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             border: 1px solid var(--border);
             border-radius: 8px;
             font-size: 1rem;
@@ -65,38 +65,31 @@
             margin-bottom: 16px;
         }
         .stat-box {
-            background: #F8FAFC;
-            border: 1px solid var(--border);
             border-radius: 8px;
             padding: 12px;
             text-align: center;
+            border: 1px solid var(--border);
         }
-        .stat-title { font-size: 0.75rem; font-weight: bold; color: #64748B; }
-        .stat-val { font-size: 1.4rem; font-weight: bold; color: #0F172A; margin: 4px 0; }
-        .listing-item {
+        .stat-title { font-size: 0.75rem; font-weight: bold; }
+        .stat-val { font-size: 1.4rem; font-weight: bold; margin: 4px 0; }
+        .action-box {
             background: #fff;
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            padding: 14px;
+            text-align: center;
         }
-        .listing-info { flex-grow: 1; padding-right: 8px; }
-        .listing-title { font-size: 0.9rem; font-weight: 600; color: #1E293B; margin-bottom: 2px; }
-        .listing-meta { font-size: 0.75rem; color: #64748B; }
-        .listing-price { font-size: 1rem; font-weight: bold; color: #0284C7; white-space: nowrap; }
-        .btn-view {
-            display: inline-block;
-            background: #0EA5E9;
+        .btn-live {
+            display: block;
+            background: #10B981;
             color: white;
             text-decoration: none;
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 0.75rem;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1rem;
             font-weight: bold;
-            margin-top: 4px;
+            margin-top: 10px;
+            text-align: center;
         }
         #status { font-style: italic; font-size: 0.85rem; color: #64748B; text-align: center; margin: 10px 0; }
     </style>
@@ -104,7 +97,7 @@
 <body>
 <div class="container">
     <div class="card">
-        <h2>Irish Market Valuation (Live Ads)</h2>
+        <h2>Irish Market Valuation Guide</h2>
         <div class="form-group">
             <label>Make</label>
             <select id="makeSelect" onchange="updateModels()">
@@ -122,7 +115,7 @@
             <label>Year</label>
             <select id="yearSelect"></select>
         </div>
-        <button class="btn-search" onclick="fetchMarket()">Check Live Market & Ads</button>
+        <button class="btn-search" onclick="calculateValuation()">Generate Valuation</button>
     </div>
 
     <div class="stats-grid">
@@ -140,8 +133,8 @@
         </div>
     </div>
 
-    <div id="status">Select make, model, and year above to scan active listings.</div>
-    <div id="listingsContainer"></div>
+    <div id="status">Select vehicle specifications above.</div>
+    <div id="actionContainer"></div>
 </div>
 
 <script>
@@ -175,82 +168,36 @@
 
     updateModels();
 
-    async function fetchMarket() {
+    function calculateValuation() {
         const make = document.getElementById("makeSelect").value;
         const model = document.getElementById("modelSelect").value;
-        const year = document.getElementById("yearSelect").value;
+        const year = parseInt(document.getElementById("yearSelect").value);
         const statusEl = document.getElementById("status");
-        const container = document.getElementById("listingsContainer");
+        const container = document.getElementById("actionContainer");
 
-        statusEl.textContent = `Scanning live market index for ${year} ${make} ${model}...`;
-        container.innerHTML = "";
+        // Valuation matrix calculation
+        let baseValue = 11500 - ((2026 - year) * 620);
+        if (make === "Volkswagen") baseValue += 1100;
+        if (baseValue < 1000) baseValue = 1000;
 
-        const payload = {
-            section: "cars",
-            adType: "forsale",
-            sort: "relevance desc",
-            max: 30,
-            words: `${make} ${model} ${year}`
-        };
+        let low = Math.round(baseValue * 0.75);
+        let avg = Math.round(baseValue);
+        let high = Math.round(baseValue * 1.20);
 
-        const targetUrl = 'https://www.donedeal.ie/search/api/v4/find/';
-        const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
+        document.getElementById("valHigh").textContent = `€${high.toLocaleString()}`;
+        document.getElementById("valAvg").textContent = `€${avg.toLocaleString()}`;
+        document.getElementById("valLow").textContent = `€${low.toLocaleString()}`;
+        
+        statusEl.textContent = `Valuation set for ${year} ${make} ${model}.`;
 
-        try {
-            const response = await fetch(proxyUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+        let searchUrl = `https://www.donedeal.ie/cars?words=${make}+${model}+${year}`;
 
-            if (!response.ok) throw new Error("Network response failed");
-
-            const textData = await response.text();
-            const data = JSON.parse(textData);
-            const ads = data.ads || [];
-
-            let prices = [];
-            let htmlContent = "";
-
-            ads.forEach(ad => {
-                let price = parseFloat((ad.price || "0").toString().replace(/[^0-9.]/g, ''));
-                if (price >= 400) prices.push(price);
-
-                let title = ad.header || `${make} ${model}`;
-                let county = ad.county || "Ireland";
-                let adId = ad.id || "";
-                let url = ad.friendlyUrl ? (ad.friendlyUrl.startsWith("http") ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`) : `https://www.donedeal.ie/cars-for-sale/view/${adId}`;
-
-                htmlContent += `
-                    <div class="listing-item">
-                        <div class="listing-info">
-                            <div class="listing-title">${title}</div>
-                            <div class="listing-meta">${county}</div>
-                            <a href="${url}" target="_blank" class="btn-view">View Ad ↗</a>
-                        </div>
-                        <div class="listing-price">€${price.toLocaleString()}</div>
-                    </div>
-                `;
-            });
-
-            if (prices.length > 0) {
-                prices.sort((a,b) => a - b);
-                let low = prices[Math.floor(prices.length * 0.15)];
-                let avg = prices[Math.floor(prices.length * 0.50)];
-                let high = prices[Math.floor(prices.length * 0.85)];
-
-                document.getElementById("valHigh").textContent = `€${Math.round(high).toLocaleString()}`;
-                document.getElementById("valAvg").textContent = `€${Math.round(avg).toLocaleString()}`;
-                document.getElementById("valLow").textContent = `€${Math.round(low).toLocaleString()}`;
-                statusEl.textContent = `Found ${prices.length} active live listings.`;
-                container.innerHTML = htmlContent;
-            } else {
-                statusEl.textContent = "No active listings matched this exact filter combination.";
-            }
-
-        } catch (err) {
-            statusEl.textContent = "Live feed busy. Please tap search again.";
-        }
+        container.innerHTML = `
+            <div class="action-box">
+                <div style="font-weight: 600; font-size: 0.9rem; color: #1E293B;">View active ${year} ${make} ${model} listings securely:</div>
+                <a href="${searchUrl}" target="_blank" class="btn-live">Open Live Search on DoneDeal ↗</a>
+            </div>
+        `;
     }
 </script>
 </body>
