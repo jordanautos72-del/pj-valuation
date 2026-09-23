@@ -117,6 +117,7 @@
         .kpi-sub { font-size: 10px; opacity: 0.8; }
         .kpi-val { font-size: 22px; font-weight: 800; }
 
+        .kpi-purple { background: #FAF5FF; border: 1px solid #E9D5FF; color: #6B21A8; }
         .kpi-green { background: #F0FDF4; border: 1px solid #BBF7D0; color: #166534; }
         .kpi-blue { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF; }
         .kpi-yellow { background: #FEFCE8; border: 1px solid #FEF08A; color: #854D0E; }
@@ -146,6 +147,17 @@
         .listing-info { flex: 1; padding-right: 10px; }
         .listing-title { font-size: 13px; font-weight: 700; color: #0F172A; margin-bottom: 4px; }
         .listing-meta { font-size: 11px; color: #64748B; display: flex; gap: 8px; align-items: center; }
+        
+        .listing-repaired-col {
+            text-align: center; 
+            padding: 0 10px; 
+            border-left: 1px solid #F1F5F9; 
+            border-right: 1px solid #F1F5F9; 
+            margin-right: 10px;
+        }
+        .listing-repaired-lbl { font-size: 9px; color: #64748B; font-weight: 700; text-transform: uppercase; }
+        .listing-repaired-val { font-size: 13px; font-weight: 800; color: #6B21A8; }
+
         .year-badge { background: #0284C7; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 10px; }
         .listing-price-col { text-align: right; }
         .listing-price { font-size: 15px; font-weight: 800; color: #0284C7; margin-bottom: 4px; }
@@ -160,16 +172,6 @@
             display: inline-block;
         }
         .btn-view:active { background: #334155; }
-        .action-link {
-            display: inline-block;
-            margin-top: 6px;
-            padding: 8px 12px;
-            background: #0284C7;
-            color: white !important;
-            font-weight: bold;
-            text-decoration: none;
-            border-radius: 6px;
-        }
     </style>
 </head>
 <body>
@@ -218,6 +220,15 @@
     </div>
 
     <div class="kpi-container">
+        <!-- New KPI that only shows in Damaged Mode -->
+        <div class="kpi kpi-purple" id="kpiRepaired" style="display: none;">
+            <div>
+                <div class="kpi-title">EST. REPAIRED VALUE</div>
+                <div class="kpi-sub">Standard Market Average</div>
+            </div>
+            <div class="kpi-val" id="statRepaired">€0</div>
+        </div>
+
         <div class="kpi kpi-green">
             <div>
                 <div class="kpi-title" id="lblHigh">DEALER / RETAIL (MINT)</div>
@@ -294,6 +305,8 @@
             document.getElementById('tabSalvage').className = section === 'damagedcars' ? 'nav-tab active' : 'nav-tab';
             document.getElementById('modeTitle').innerText = section === 'cars' ? 'Standard Valuation' : 'Damaged / Salvage';
 
+            document.getElementById('kpiRepaired').style.display = section === 'damagedcars' ? 'flex' : 'none';
+
             if (section === 'damagedcars') {
                 document.getElementById('lblHigh').innerText = 'HIGHEST SALVAGE ASKING';
                 document.getElementById('subHigh').innerText = 'Minor Damage / High Spec';
@@ -334,7 +347,7 @@
                         const data = JSON.parse(cached);
                         const daysOld = Math.floor((new Date() - new Date(data.date)) / (1000 * 60 * 60 * 24));
                         if (daysOld < 30) {
-                            renderResults(data.high, data.avg, data.low, data.listings);
+                            renderResults(data.high, data.avg, data.low, data.listings, data.stdAvg || 0);
                             status.innerText = `Loaded from Cache (${daysOld}d old)`;
                             return;
                         }
@@ -342,17 +355,50 @@
                 }
             }
 
-            status.innerText = `Querying live DoneDeal ${currentSection === 'damagedcars' ? 'Salvage' : 'Standard'} market...`;
+            status.innerText = `Querying live DoneDeal ${currentSection === 'damagedcars' ? 'Salvage & Standard Baseline' : 'Standard'} market...`;
 
-            // Search by model or just model keyword to catch titles like "18 Focus"
-            const workerUrl = `https://pj-val-proxy.pauljordanie.workers.dev/?section=${currentSection}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
+            const primaryUrl = `https://pj-val-proxy.pauljordanie.workers.dev/?section=${currentSection}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
+            
+            // Prepare concurrent requests
+            const fetchPromises = [ fetch(primaryUrl).then(r => r.ok ? r.json() : null).catch(()=>null) ];
+            let stdIndex = -1;
+            let stdAvg = 0;
 
-            let data = null;
-            try {
-                const res = await fetch(workerUrl);
-                if (res.ok) data = await res.json();
-            } catch (err) {
-                console.error(err);
+            // If in salvage mode, fetch the standard cars concurrently to establish the repaired baseline
+            if (currentSection === 'damagedcars') {
+                const stdCacheKey = `cars_${make}_${model}_${yearFrom}_${yearTo}`.toLowerCase();
+                let needFetch = true;
+                if (!forceFresh) {
+                    const cachedStd = localStorage.getItem(stdCacheKey);
+                    if (cachedStd) {
+                        try {
+                            stdAvg = JSON.parse(cachedStd).avg;
+                            needFetch = false;
+                        } catch(e) {}
+                    }
+                }
+                
+                if (needFetch) {
+                    const stdUrl = `https://pj-val-proxy.pauljordanie.workers.dev/?section=cars&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
+                    stdIndex = fetchPromises.length;
+                    fetchPromises.push(fetch(stdUrl).then(r => r.ok ? r.json() : null).catch(()=>null));
+                }
+            }
+
+            const results = await Promise.all(fetchPromises);
+            const data = results[0];
+
+            // Parse standard market average if we fetched it
+            if (stdIndex !== -1 && results[stdIndex] && results[stdIndex].ads) {
+                let stdPrices = [];
+                results[stdIndex].ads.forEach(ad => {
+                    let p = parseFloat((ad.price||"").replace(/[^0-9.]/g, ''))||0;
+                    if (p >= 400) stdPrices.push(p);
+                });
+                if (stdPrices.length > 0) {
+                    stdPrices.sort((a,b) => a - b);
+                    stdAvg = getPercentile(stdPrices, 50);
+                }
             }
 
             if (!data || !data.ads || data.ads.length === 0) {
@@ -378,17 +424,18 @@
                         adUrl = `https://www.donedeal.ie/${currentSection}-for-sale/view/${ad.id}`;
                     }
 
+                    // For standard cars, pull the year from the payload (Worker injects ad.year for Salvage)
                     let adYear = yearFrom;
-                    const titleText = ad.header || `${make} ${model}`;
-                    const yearMatch = titleText.match(/\b(20[0-2][0-9])\b/);
-                    if (yearMatch) {
-                        adYear = yearMatch[1];
-                    } else if (ad.year) {
+                    if (ad.year) {
                         adYear = ad.year;
+                    } else {
+                        const titleText = ad.header || "";
+                        const yearMatch = titleText.match(/\b(20[0-2][0-9])\b/);
+                        if (yearMatch) adYear = yearMatch[1];
                     }
 
                     listings.push({
-                        title: titleText,
+                        title: ad.header || `${make} ${model}`,
                         year: adYear,
                         price: priceNum,
                         location: ad.county || 'Ireland',
@@ -413,17 +460,22 @@
                 high: high,
                 avg: avg,
                 low: low,
+                stdAvg: stdAvg,
                 listings: listings
             }));
 
-            renderResults(high, avg, low, listings);
+            renderResults(high, avg, low, listings, stdAvg);
             status.innerText = `Market guide updated (${prices.length} vehicles found).`;
         }
 
-        function renderResults(high, avg, low, items) {
+        function renderResults(high, avg, low, items, stdAvg = 0) {
             document.getElementById('statHigh').innerText = '€' + Math.round(high).toLocaleString();
             document.getElementById('statAvg').innerText = '€' + Math.round(avg).toLocaleString();
             document.getElementById('statLow').innerText = '€' + Math.round(low).toLocaleString();
+            
+            if (currentSection === 'damagedcars') {
+                document.getElementById('statRepaired').innerText = stdAvg > 0 ? '€' + Math.round(stdAvg).toLocaleString() : 'N/A';
+            }
 
             const container = document.getElementById('listingsList');
             container.innerHTML = '';
@@ -433,6 +485,17 @@
             items.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'listing-card';
+                
+                let midColumn = '';
+                if (currentSection === 'damagedcars' && stdAvg > 0) {
+                    midColumn = `
+                        <div class="listing-repaired-col">
+                            <div class="listing-repaired-lbl">Repaired Avg</div>
+                            <div class="listing-repaired-val">€${Math.round(stdAvg).toLocaleString()}</div>
+                        </div>
+                    `;
+                }
+
                 div.innerHTML = `
                     <div class="listing-info">
                         <div class="listing-title">${item.title}</div>
@@ -441,6 +504,7 @@
                             <span>📍 ${item.location}</span>
                         </div>
                     </div>
+                    ${midColumn}
                     <div class="listing-price-col">
                         <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
                         ${item.url ? `<a href="${item.url}" target="_blank" class="btn-view">View Ad ↗</a>` : ''}
