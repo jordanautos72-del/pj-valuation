@@ -1,399 +1,370 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>PJ Market Valuation</title>
-<meta name="theme-color" content="#0F172A">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<style>
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-body {
-margin: 0;
-padding: 14px;
-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-background-color: #F1F5F9;
-color: #0F172A;
-}
-.header {
-background-color: #0F172A;
-color: #FFFFFF;
-padding: 16px;
-border-radius: 12px;
-margin-bottom: 14px;
-display: flex;
-align-items: center;
-justify-content: space-between;
-}
-.header h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
-.header span { font-size: 11px; color: #38BDF8; font-weight: bold; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PJ Market Valuation</title>
+    <meta name="theme-color" content="#0F172A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0;
+            padding: 14px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #F1F5F9;
+            color: #0F172A;
+        }
+        .header {
+            background-color: #0F172A;
+            color: #FFFFFF;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
+        .header span { font-size: 11px; color: #38BDF8; font-weight: bold; }
+        
+        .card {
+            background: #FFFFFF;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+        }
+        
+        .field-group { margin-bottom: 12px; }
+        .field-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        select {
+            width: 100%;
+            height: 44px;
+            border: 1px solid #CBD5E1;
+            border-radius: 8px;
+            background: #FFFFFF;
+            padding: 0 12px;
+            font-size: 15px;
+            color: #0F172A;
+            font-weight: 600;
+            outline: none;
+        }
+        select:focus { border-color: #0284C7; }
 
-.card {
-background: #FFFFFF;
-border-radius: 12px;
-padding: 16px;
-margin-bottom: 14px;
-box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
-}
+        .btn-row { display: flex; gap: 8px; margin-top: 14px; }
+        button {
+            flex: 1;
+            height: 48px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-primary { background: #0284C7; color: white; }
+        .btn-primary:active { background: #0369A1; }
+        .btn-sec { background: #E2E8F0; color: #334155; flex: 0.4; }
+        .btn-sec:active { background: #CBD5E1; }
 
-.field-group { margin-bottom: 12px; }
-.field-group label {
-display: block;
-font-size: 12px;
-font-weight: 700;
-color: #475569;
-margin-bottom: 5px;
-text-transform: uppercase;
-}
-select {
-width: 100%;
-height: 44px;
-border: 1px solid #CBD5E1;
-border-radius: 8px;
-background: #FFFFFF;
-padding: 0 12px;
-font-size: 15px;
-color: #0F172A;
-font-weight: 600;
-outline: none;
-}
-select:focus { border-color: #0284C7; }
+        .kpi-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+        .kpi {
+            border-radius: 10px;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .kpi-title { font-size: 12px; font-weight: 700; }
+        .kpi-sub { font-size: 10px; opacity: 0.8; }
+        .kpi-val { font-size: 22px; font-weight: 800; }
 
-.btn-row { display: flex; gap: 8px; margin-top: 14px; }
-button {
-flex: 1;
-height: 48px;
-border: none;
-border-radius: 8px;
-font-size: 14px;
-font-weight: 700;
-cursor: pointer;
-display: flex;
-align-items: center;
-justify-content: center;
-}
-.btn-primary { background: #0284C7; color: white; }
-.btn-primary:active { background: #0369A1; }
-.btn-sec { background: #E2E8F0; color: #334155; flex: 0.4; }
-.btn-sec:active { background: #CBD5E1; }
+        .kpi-green { background: #F0FDF4; border: 1px solid #BBF7D0; color: #166534; }
+        .kpi-blue { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF; }
+        .kpi-yellow { background: #FEFCE8; border: 1px solid #FEF08A; color: #854D0E; }
 
-.kpi-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-.kpi {
-border-radius: 10px;
-padding: 12px 16px;
-display: flex;
-justify-content: space-between;
-align-items: center;
-}
-.kpi-title { font-size: 12px; font-weight: 700; }
-.kpi-sub { font-size: 10px; opacity: 0.8; }
-.kpi-val { font-size: 22px; font-weight: 800; }
+        .status-bar {
+            font-size: 12px;
+            color: #475569;
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            background: #FFFFFF;
+            border-radius: 8px;
+            border: 1px solid #E2E8F0;
+            line-height: 1.5;
+        }
 
-.kpi-green { background: #F0FDF4; border: 1px solid #BBF7D0; color: #166534; }
-.kpi-blue { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF; }
-.kpi-yellow { background: #FEFCE8; border: 1px solid #FEF08A; color: #854D0E; }
-
-.status-bar {
-font-size: 12px;
-color: #475569;
-margin-bottom: 12px;
-padding: 10px 12px;
-background: #FFFFFF;
-border-radius: 8px;
-border: 1px solid #E2E8F0;
-line-height: 1.5;
-}
-
-.listing-card {
-background: #FFFFFF;
-border-radius: 10px;
-padding: 12px 14px;
-margin-bottom: 8px;
-display: flex;
-justify-content: space-between;
-align-items: center;
-box-shadow: 0 1px 3px rgba(15,23,42,0.06);
-border: 1px solid #E2E8F0;
-}
-.listing-info { flex: 1; padding-right: 10px; }
-.listing-title { font-size: 13px; font-weight: 700; color: #0F172A; margin-bottom: 3px; }
-.listing-meta { font-size: 11px; color: #64748B; }
-.listing-price-col { text-align: right; }
-.listing-price { font-size: 15px; font-weight: 800; color: #0284C7; margin-bottom: 4px; }
-.btn-view {
-background: #0F172A;
-color: white;
-padding: 6px 10px;
-border-radius: 6px;
-font-size: 11px;
-font-weight: 700;
-text-decoration: none;
-display: inline-block;
-}
-.btn-view:active { background: #334155; }
-.action-link {
-display: inline-block;
-margin-top: 6px;
-padding: 8px 12px;
-background: #0284C7;
-color: white !important;
-font-weight: bold;
-text-decoration: none;
-border-radius: 6px;
-}
-</style>
+        .listing-card {
+            background: #FFFFFF;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(15,23,42,0.06);
+            border: 1px solid #E2E8F0;
+        }
+        .listing-info { flex: 1; padding-right: 10px; }
+        .listing-title { font-size: 13px; font-weight: 700; color: #0F172A; margin-bottom: 3px; }
+        .listing-meta { font-size: 11px; color: #64748B; }
+        .listing-price-col { text-align: right; }
+        .listing-price { font-size: 15px; font-weight: 800; color: #0284C7; margin-bottom: 4px; }
+        .btn-view {
+            background: #0F172A;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-view:active { background: #334155; }
+        .action-link {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 8px 12px;
+            background: #0284C7;
+            color: white !important;
+            font-weight: bold;
+            text-decoration: none;
+            border-radius: 6px;
+        }
+    </style>
 </head>
 <body>
 
-<div class="header">
-<h1>PJ MARKET VALUATION</h1>
-<span>DoneDeal Live</span>
-</div>
+    <div class="header">
+        <h1>PJ MARKET VALUATION</h1>
+        <span>DoneDeal Live</span>
+    </div>
 
-<div class="card">
-<div class="field-group">
-<label>Make</label>
-<select id="makeSelect" onchange="updateModels()">
-<option value="Nissan">Nissan</option>
-<option value="Ford">Ford</option>
-<option value="Volkswagen">Volkswagen</option>
-</select>
-</div>
+    <div class="card">
+        <div class="field-group">
+            <label>Make</label>
+            <select id="makeSelect" onchange="updateModels()">
+                <option value="Nissan">Nissan</option>
+                <option value="Ford">Ford</option>
+                <option value="Volkswagen">Volkswagen</option>
+            </select>
+        </div>
 
-<div class="field-group">
-<label>Model</label>
-<select id="modelSelect"></select>
-</div>
+        <div class="field-group">
+            <label>Model</label>
+            <select id="modelSelect"></select>
+        </div>
 
-<div class="field-group">
-<label>Year</label>
-<select id="yearSelect"></select>
-</div>
+        <div class="field-group">
+            <label>Year</label>
+            <select id="yearSelect"></select>
+        </div>
 
-<div class="btn-row">
-<button class="btn-primary" onclick="lookupVehicle(false)">🔍 Check Valuation</button>
-<button class="btn-sec" onclick="lookupVehicle(true)" title="Force fresh scrape">⚡ Live</button>
-</div>
-</div>
+        <div class="btn-row">
+            <button class="btn-primary" onclick="lookupVehicle(false)">🔍 Check Valuation</button>
+            <button class="btn-sec" onclick="lookupVehicle(true)" title="Force fresh scrape">⚡ Live</button>
+        </div>
+    </div>
 
-<div class="kpi-container">
-<div class="kpi kpi-green">
-<div>
-<div class="kpi-title">DEALER / RETAIL (MINT)</div>
-<div class="kpi-sub">Clean NCT / Forecourt Guide</div>
-</div>
-<div class="kpi-val" id="dealerHigh">€0</div>
-</div>
+    <div class="kpi-container">
+        <div class="kpi kpi-green">
+            <div>
+                <div class="kpi-title">DEALER / RETAIL (MINT)</div>
+                <div class="kpi-sub">Clean NCT / Forecourt Guide</div>
+            </div>
+            <div class="kpi-val" id="dealerHigh">€0</div>
+        </div>
 
-<div class="kpi kpi-blue">
-<div>
-<div class="kpi-title">MARKET AVERAGE</div>
-<div class="kpi-sub">Typical Asking Price</div>
-</div>
-<div class="kpi-val" id="marketAvg">€0</div>
-</div>
+        <div class="kpi kpi-blue">
+            <div>
+                <div class="kpi-title">MARKET AVERAGE</div>
+                <div class="kpi-sub">Typical Asking Price</div>
+            </div>
+            <div class="kpi-val" id="marketAvg">€0</div>
+        </div>
 
-<div class="kpi kpi-yellow">
-<div>
-<div class="kpi-title">TRADE / BUY TARGET</div>
-<div class="kpi-sub">Short NCT / Prep Project</div>
-</div>
-<div class="kpi-val" id="tradeLow">€0</div>
-</div>
-</div>
+        <div class="kpi kpi-yellow">
+            <div>
+                <div class="kpi-title">TRADE / BUY TARGET</div>
+                <div class="kpi-sub">Short NCT / Prep Project</div>
+            </div>
+            <div class="kpi-val" id="tradeLow">€0</div>
+        </div>
+    </div>
 
-<div class="status-bar" id="statusBar">Ready. Select vehicle and tap Check Valuation.</div>
+    <div class="status-bar" id="statusBar">Ready. Select vehicle and tap Check Valuation.</div>
 
-<div id="listingsList"></div>
+    <div id="listingsList"></div>
 
-<script>
-const models = {
-'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note'],
-'Ford': ['Focus', 'Fiesta', 'Mondeo', 'Kuga', 'Transit Connect'],
-'Volkswagen': ['Golf', 'Passat', 'Polo', 'Tiguan', 'Caddy']
-};
+    <script>
+        const models = {
+            'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note'],
+            'Ford': ['Focus', 'Fiesta', 'Mondeo', 'Kuga', 'Transit Connect'],
+            'Volkswagen': ['Golf', 'Passat', 'Polo', 'Tiguan', 'Caddy']
+        };
 
-function initDropdowns() {
-const yearSel = document.getElementById('yearSelect');
-const currentYear = new Date().getFullYear();
-for (let y = currentYear; y >= 2006; y--) {
-const opt = document.createElement('option');
-opt.value = y;
-opt.text = y;
-if (y === 2011) opt.selected = true;
-yearSel.appendChild(opt);
-}
-updateModels();
-}
+        function initDropdowns() {
+            const yearSel = document.getElementById('yearSelect');
+            const currentYear = new Date().getFullYear();
+            for (let y = currentYear; y >= 2006; y--) {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.text = y;
+                if (y === 2011) opt.selected = true;
+                yearSel.appendChild(opt);
+            }
+            updateModels();
+        }
 
-function updateModels() {
-const make = document.getElementById('makeSelect').value;
-const modelSel = document.getElementById('modelSelect');
-modelSel.innerHTML = '';
-models[make].forEach(m => {
-const opt = document.createElement('option');
-opt.value = m;
-opt.text = m;
-modelSel.appendChild(opt);
-});
-}
+        function updateModels() {
+            const make = document.getElementById('makeSelect').value;
+            const modelSel = document.getElementById('modelSelect');
+            modelSel.innerHTML = '';
+            models[make].forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.text = m;
+                modelSel.appendChild(opt);
+            });
+        }
 
-function getPercentile(arr, p) {
-if (arr.length === 0) return 0;
-const idx = Math.min(Math.floor((p / 100) * arr.length), arr.length - 1);
-return arr[idx];
-}
+        function getPercentile(arr, p) {
+            if (arr.length === 0) return 0;
+            const idx = Math.min(Math.floor((p / 100) * arr.length), arr.length - 1);
+            return arr[idx];
+        }
 
-async function lookupVehicle(forceFresh) {
-const make = document.getElementById('makeSelect').value;
-const model = document.getElementById('modelSelect').value;
-const year = document.getElementById('yearSelect').value;
-const cacheKey = `${make}_${model}_${year}`.toLowerCase();
-const status = document.getElementById('statusBar');
+        async function lookupVehicle(forceFresh) {
+            const make = document.getElementById('makeSelect').value;
+            const model = document.getElementById('modelSelect').value;
+            const year = document.getElementById('yearSelect').value;
+            const cacheKey = `${make}_${model}_${year}`.toLowerCase();
+            const status = document.getElementById('statusBar');
 
-if (!forceFresh) {
-const cached = localStorage.getItem(cacheKey);
-if (cached) {
-try {
-const data = JSON.parse(cached);
-const daysOld = Math.floor((new Date() - new Date(data.date)) / (1000 * 60 * 60 * 24));
-if (daysOld < 30) {
-renderResults(data.dealerHigh, data.marketAvg, data.tradeLow, data.listings);
-status.innerText = `Loaded from 30-Day Cache (${daysOld}d old — Saved ${data.date})`;
-return;
-}
-} catch (e) {}
-}
-}
+            if (!forceFresh) {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    try {
+                        const data = JSON.parse(cached);
+                        const daysOld = Math.floor((new Date() - new Date(data.date)) / (1000 * 60 * 60 * 24));
+                        if (daysOld < 30) {
+                            renderResults(data.dealerHigh, data.marketAvg, data.tradeLow, data.listings);
+                            status.innerText = `Loaded from 30-Day Cache (${daysOld}d old — Saved ${data.date})`;
+                            return;
+                        }
+                    } catch (e) {}
+                }
+            }
 
-status.innerText = `Querying live DoneDeal market index for ${year} ${make} ${model}...`;
+            status.innerText = `Querying live DoneDeal market index for ${year} ${make} ${model}...`;
 
-            const rawTargetUrl = 'https://www.donedeal.ie/search/api/v4/find/';
-            const payload = {
-                section: 'cars',
-                adType: 'forsale',
-                sort: 'relevance desc',
-                max: 30,
-                start: 0,
-                words: `${make} ${model} ${year}`
-            };
             const workerUrl = `https://pj-val-proxy.pauljordanie.workers.dev/?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year=${encodeURIComponent(year)}`;
 
-let data = null;
+            let data = null;
 
-            // Strategy 1: Dedicated CORS Gateway
-try {
-                const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(rawTargetUrl);
-                const res = await fetch(proxyUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+            try {
                 const res = await fetch(workerUrl);
-if (res.ok) data = await res.json();
-            } catch (err) {}
-
-            // Strategy 2: Direct Fetch
-            if (!data) {
-                try {
-                    const res = await fetch(rawTargetUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (res.ok) data = await res.json();
-                } catch (err) {}
+                if (res.ok) data = await res.json();
             } catch (err) {
                 console.error(err);
-}
+            }
 
-const searchLink = `https://www.donedeal.ie/cars/${make.toLowerCase()}/${model.toLowerCase().replace(' ', '-')}?year_from=${year}&year_to=${year}`;
+            const searchLink = `https://www.donedeal.ie/cars/${make.toLowerCase()}/${model.toLowerCase().replace(' ', '-')}?year_from=${year}&year_to=${year}`;
 
-if (!data || !data.ads || data.ads.length === 0) {
-                status.innerHTML = `Mobile network CORS prevented background scrape.<br>` +
+            if (!data || !data.ads || data.ads.length === 0) {
                 status.innerHTML = `Could not load listings via worker bridge.<br>` +
-`<a href="${searchLink}" target="_blank" class="action-link">Open ${year} ${make} ${model} on DoneDeal ↗</a>`;
-return;
-}
+                    `<a href="${searchLink}" target="_blank" class="action-link">Open ${year} ${make} ${model} on DoneDeal ↗</a>`;
+                return;
+            }
 
-let listings = [];
-let prices = [];
+            let listings = [];
+            let prices = [];
 
-data.ads.forEach(ad => {
-let priceNum = 0;
-if (ad.price) {
-priceNum = parseFloat(ad.price.replace(/[^0-9.]/g, '')) || 0;
-}
+            data.ads.forEach(ad => {
+                let priceNum = 0;
+                if (ad.price) {
+                    priceNum = parseFloat(ad.price.replace(/[^0-9.]/g, '')) || 0;
+                }
 
-if (priceNum >= 400) {
-let adUrl = '';
-if (ad.friendlyUrl && ad.friendlyUrl.length > 0) {
-adUrl = ad.friendlyUrl.startsWith('http') ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`;
-} else if (ad.id) {
-adUrl = `https://www.donedeal.ie/cars-for-sale/view/${ad.id}`;
-}
+                if (priceNum >= 400) {
+                    let adUrl = '';
+                    if (ad.friendlyUrl && ad.friendlyUrl.length > 0) {
+                        adUrl = ad.friendlyUrl.startsWith('http') ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`;
+                    } else if (ad.id) {
+                        adUrl = `https://www.donedeal.ie/cars-for-sale/view/${ad.id}`;
+                    }
 
-listings.push({
-title: ad.header || `${make} ${model}`,
-price: priceNum,
-location: ad.county || 'Ireland',
-url: adUrl
-});
-prices.push(priceNum);
-}
-});
+                    listings.push({
+                        title: ad.header || `${make} ${model}`,
+                        price: priceNum,
+                        location: ad.county || 'Ireland',
+                        url: adUrl
+                    });
+                    prices.push(priceNum);
+                }
+            });
 
-if (prices.length === 0) {
-status.innerText = 'No realistic asking prices found.';
-return;
-}
+            if (prices.length === 0) {
+                status.innerText = 'No realistic asking prices found.';
+                return;
+            }
 
-prices.sort((a, b) => a - b);
-const low = getPercentile(prices, 15);
-const avg = getPercentile(prices, 50);
-const high = getPercentile(prices, 85);
+            prices.sort((a, b) => a - b);
+            const low = getPercentile(prices, 15);
+            const avg = getPercentile(prices, 50);
+            const high = getPercentile(prices, 85);
 
-localStorage.setItem(cacheKey, JSON.stringify({
-date: new Date().toISOString().split('T')[0],
-dealerHigh: high,
-marketAvg: avg,
-tradeLow: low,
-listings: listings
-}));
+            localStorage.setItem(cacheKey, JSON.stringify({
+                date: new Date().toISOString().split('T')[0],
+                dealerHigh: high,
+                marketAvg: avg,
+                tradeLow: low,
+                listings: listings
+            }));
 
-renderResults(high, avg, low, listings);
-status.innerText = `Live market valuation updated (${prices.length} comparable cars found).`;
-}
+            renderResults(high, avg, low, listings);
+            status.innerText = `Live market valuation updated (${prices.length} comparable cars found).`;
+        }
 
-function renderResults(high, avg, low, items) {
-document.getElementById('dealerHigh').innerText = '€' + Math.round(high).toLocaleString();
-document.getElementById('marketAvg').innerText = '€' + Math.round(avg).toLocaleString();
-document.getElementById('tradeLow').innerText = '€' + Math.round(low).toLocaleString();
+        function renderResults(high, avg, low, items) {
+            document.getElementById('dealerHigh').innerText = '€' + Math.round(high).toLocaleString();
+            document.getElementById('marketAvg').innerText = '€' + Math.round(avg).toLocaleString();
+            document.getElementById('tradeLow').innerText = '€' + Math.round(low).toLocaleString();
 
-const container = document.getElementById('listingsList');
-container.innerHTML = '';
+            const container = document.getElementById('listingsList');
+            container.innerHTML = '';
 
-items.sort((a, b) => b.price - a.price);
+            items.sort((a, b) => b.price - a.price);
 
-items.forEach(item => {
-const div = document.createElement('div');
-div.className = 'listing-card';
-div.innerHTML = `
-                   <div class="listing-info">
-                       <div class="listing-title">${item.title}</div>
-                       <div class="listing-meta">📍 ${item.location}</div>
-                   </div>
-                   <div class="listing-price-col">
-                       <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
-                       ${item.url ? `<a href="${item.url}" target="_blank" class="btn-view">View Ad ↗</a>` : ''}
-                   </div>
-               `;
-container.appendChild(div);
-});
-}
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'listing-card';
+                div.innerHTML = `
+                    <div class="listing-info">
+                        <div class="listing-title">${item.title}</div>
+                        <div class="listing-meta">📍 ${item.location}</div>
+                    </div>
+                    <div class="listing-price-col">
+                        <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
+                        ${item.url ? `<a href="${item.url}" target="_blank" class="btn-view">View Ad ↗</a>` : ''}
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
 
-initDropdowns();
-</script>
+        initDropdowns();
+    </script>
 </body>
 </html>
