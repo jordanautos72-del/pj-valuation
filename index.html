@@ -46,6 +46,9 @@
             margin-bottom: 5px;
             text-transform: uppercase;
         }
+        .row-group { display: flex; gap: 10px; }
+        .row-group .field-group { flex: 1; }
+
         select {
             width: 100%;
             height: 44px;
@@ -167,9 +170,15 @@
             <select id="modelSelect"></select>
         </div>
 
-        <div class="field-group">
-            <label>Year</label>
-            <select id="yearSelect"></select>
+        <div class="row-group">
+            <div class="field-group">
+                <label>Year From</label>
+                <select id="yearFromSelect"></select>
+            </div>
+            <div class="field-group">
+                <label>Year To</label>
+                <select id="yearToSelect"></select>
+            </div>
         </div>
 
         <div class="btn-row">
@@ -217,14 +226,20 @@
         };
 
         function initDropdowns() {
-            const yearSel = document.getElementById('yearSelect');
+            const yearFromSel = document.getElementById('yearFromSelect');
+            const yearToSel = document.getElementById('yearToSelect');
             const currentYear = new Date().getFullYear();
+            
             for (let y = currentYear; y >= 2006; y--) {
-                const opt = document.createElement('option');
-                opt.value = y;
-                opt.text = y;
-                if (y === 2011) opt.selected = true;
-                yearSel.appendChild(opt);
+                const opt1 = document.createElement('option');
+                opt1.value = y; opt1.text = y;
+                if (y === 2010) opt1.selected = true;
+                yearFromSel.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = y; opt2.text = y;
+                if (y === 2012) opt2.selected = true;
+                yearToSel.appendChild(opt2);
             }
             updateModels();
         }
@@ -250,8 +265,9 @@
         async function lookupVehicle(forceFresh) {
             const make = document.getElementById('makeSelect').value;
             const model = document.getElementById('modelSelect').value;
-            const year = document.getElementById('yearSelect').value;
-            const cacheKey = `${make}_${model}_${year}`.toLowerCase();
+            const yearFrom = document.getElementById('yearFromSelect').value;
+            const yearTo = document.getElementById('yearToSelect').value;
+            const cacheKey = `${make}_${model}_${yearFrom}_${yearTo}`.toLowerCase();
             const status = document.getElementById('statusBar');
 
             if (!forceFresh) {
@@ -269,9 +285,9 @@
                 }
             }
 
-            status.innerText = `Querying live DoneDeal market index for ${year} ${make} ${model}...`;
+            status.innerText = `Querying live DoneDeal market index for ${yearFrom}-${yearTo} ${make} ${model}...`;
 
-            const workerUrl = `https://pj-val-proxy.pauljordanie.workers.dev/?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year=${encodeURIComponent(year)}`;
+            const workerUrl = `https://pj-val-proxy.pauljordanie.workers.dev/?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
 
             let data = null;
 
@@ -282,11 +298,11 @@
                 console.error(err);
             }
 
-            const searchLink = `https://www.donedeal.ie/cars/${make.toLowerCase()}/${model.toLowerCase().replace(' ', '-')}?year_from=${year}&year_to=${year}`;
+            const searchLink = `https://www.donedeal.ie/cars/${make.toLowerCase()}/${model.toLowerCase().replace(' ', '-')}?year_from=${yearFrom}&year_to=${yearTo}`;
 
             if (!data || !data.ads || data.ads.length === 0) {
                 status.innerHTML = `Could not load listings via worker bridge.<br>` +
-                    `<a href="${searchLink}" target="_blank" class="action-link">Open ${year} ${make} ${model} on DoneDeal ↗</a>`;
+                    `<a href="${searchLink}" target="_blank" class="action-link">Open ${yearFrom}-${yearTo} ${make} ${model} on DoneDeal ↗</a>`;
                 return;
             }
 
