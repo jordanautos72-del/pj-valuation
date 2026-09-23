@@ -43,7 +43,7 @@
         }
         select, button {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             border: 1px solid var(--border);
             border-radius: 8px;
             font-size: 1rem;
@@ -65,31 +65,38 @@
             margin-bottom: 16px;
         }
         .stat-box {
+            background: #F8FAFC;
+            border: 1px solid var(--border);
             border-radius: 8px;
             padding: 12px;
             text-align: center;
-            border: 1px solid var(--border);
         }
-        .stat-title { font-size: 0.75rem; font-weight: bold; }
-        .stat-val { font-size: 1.4rem; font-weight: bold; margin: 4px 0; }
-        .action-box {
+        .stat-title { font-size: 0.75rem; font-weight: bold; color: #64748B; }
+        .stat-val { font-size: 1.4rem; font-weight: bold; color: #0F172A; margin: 4px 0; }
+        .listing-item {
             background: #fff;
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 14px;
-            text-align: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .btn-live {
-            display: block;
-            background: #10B981;
+        .listing-info { flex-grow: 1; padding-right: 8px; }
+        .listing-title { font-size: 0.9rem; font-weight: 600; color: #1E293B; margin-bottom: 2px; }
+        .listing-meta { font-size: 0.75rem; color: #64748B; }
+        .listing-price { font-size: 1rem; font-weight: bold; color: #0284C7; white-space: nowrap; }
+        .btn-view {
+            display: inline-block;
+            background: #0EA5E9;
             color: white;
             text-decoration: none;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 1rem;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
             font-weight: bold;
-            margin-top: 10px;
-            text-align: center;
+            margin-top: 4px;
         }
         #status { font-style: italic; font-size: 0.85rem; color: #64748B; text-align: center; margin: 10px 0; }
     </style>
@@ -97,7 +104,7 @@
 <body>
 <div class="container">
     <div class="card">
-        <h2>Irish Market Valuation Guide</h2>
+        <h2>Irish Market Valuation & Adverts</h2>
         <div class="form-group">
             <label>Make</label>
             <select id="makeSelect" onchange="updateModels()">
@@ -115,7 +122,7 @@
             <label>Year</label>
             <select id="yearSelect"></select>
         </div>
-        <button class="btn-search" onclick="calculateValuation()">Generate Valuation</button>
+        <button class="btn-search" onclick="fetchMarket()">Scan Active Adverts</button>
     </div>
 
     <div class="stats-grid">
@@ -133,8 +140,8 @@
         </div>
     </div>
 
-    <div id="status">Select vehicle specifications above.</div>
-    <div id="actionContainer"></div>
+    <div id="status">Select vehicle specifications and tap scan.</div>
+    <div id="listingsContainer"></div>
 </div>
 
 <script>
@@ -168,36 +175,82 @@
 
     updateModels();
 
-    function calculateValuation() {
+    async function fetchMarket() {
         const make = document.getElementById("makeSelect").value;
         const model = document.getElementById("modelSelect").value;
-        const year = parseInt(document.getElementById("yearSelect").value);
+        const year = document.getElementById("yearSelect").value;
         const statusEl = document.getElementById("status");
-        const container = document.getElementById("actionContainer");
+        const container = document.getElementById("listingsContainer");
 
-        // Valuation matrix calculation
-        let baseValue = 11500 - ((2026 - year) * 620);
-        if (make === "Volkswagen") baseValue += 1100;
-        if (baseValue < 1000) baseValue = 1000;
+        statusEl.textContent = `Scanning active listings for ${year} ${make} ${model}...`;
+        container.innerHTML = "";
 
-        let low = Math.round(baseValue * 0.75);
-        let avg = Math.round(baseValue);
-        let high = Math.round(baseValue * 1.20);
+        const payload = {
+            section: "cars",
+            adType: "forsale",
+            sort: "relevance desc",
+            max: 25,
+            words: `${make} ${model} ${year}`
+        };
 
-        document.getElementById("valHigh").textContent = `€${high.toLocaleString()}`;
-        document.getElementById("valAvg").textContent = `€${avg.toLocaleString()}`;
-        document.getElementById("valLow").textContent = `€${low.toLocaleString()}`;
-        
-        statusEl.textContent = `Valuation set for ${year} ${make} ${model}.`;
+        // Utilizing a stable JSON translation proxy route to return listing feeds securely
+        const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://www.donedeal.ie/search/api/v4/find/');
 
-        let searchUrl = `https://www.donedeal.ie/cars?words=${make}+${model}+${year}`;
+        try {
+            const response = await fetch(proxyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-        container.innerHTML = `
-            <div class="action-box">
-                <div style="font-weight: 600; font-size: 0.9rem; color: #1E293B;">View active ${year} ${make} ${model} listings securely:</div>
-                <a href="${searchUrl}" target="_blank" class="btn-live">Open Live Search on DoneDeal ↗</a>
-            </div>
-        `;
+            if (!response.ok) throw new Error("Connection failed");
+
+            const wrapper = await response.json();
+            const data = JSON.parse(wrapper.contents);
+            const ads = data.ads || [];
+
+            let prices = [];
+            let htmlContent = "";
+
+            ads.forEach(ad => {
+                let price = parseFloat((ad.price || "0").toString().replace(/[^0-9.]/g, ''));
+                if (price >= 400) prices.push(price);
+
+                let title = ad.header || `${make} ${model}`;
+                let county = ad.county || "Ireland";
+                let adId = ad.id || "";
+                let url = ad.friendlyUrl ? (ad.friendlyUrl.startsWith("http") ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`) : `https://www.donedeal.ie/cars-for-sale/view/${adId}`;
+
+                htmlContent += `
+                    <div class="listing-item">
+                        <div class="listing-info">
+                            <div class="listing-title">${title}</div>
+                            <div class="listing-meta">${county}</div>
+                            <a href="${url}" target="_blank" class="btn-view">View Ad ↗</a>
+                        </div>
+                        <div class="listing-price">€${price.toLocaleString()}</div>
+                    </div>
+                `;
+            });
+
+            if (prices.length > 0) {
+                prices.sort((a,b) => a - b);
+                let low = prices[Math.floor(prices.length * 0.15)];
+                let avg = prices[Math.floor(prices.length * 0.50)];
+                let high = prices[Math.floor(prices.length * 0.85)];
+
+                document.getElementById("valHigh").textContent = `€${Math.round(high).toLocaleString()}`;
+                document.getElementById("valAvg").textContent = `€${Math.round(avg).toLocaleString()}`;
+                document.getElementById("valLow").textContent = `€${Math.round(low).toLocaleString()}`;
+                statusEl.textContent = `Successfully loaded ${prices.length} active adverts.`;
+                container.innerHTML = htmlContent;
+            } else {
+                statusEl.textContent = "No active adverts found for this specific filter.";
+            }
+
+        } catch (err) {
+            statusEl.textContent = "Live feed currently protected. Tap scan again to retry.";
+        }
     }
 </script>
 </body>
