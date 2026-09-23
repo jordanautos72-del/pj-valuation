@@ -265,12 +265,12 @@
             for (let y = currentYear; y >= 2006; y--) {
                 const opt1 = document.createElement('option');
                 opt1.value = y; opt1.text = y;
-                if (y === 2010) opt1.selected = true;
+                if (y === 2018) opt1.selected = true;
                 yearFromSel.appendChild(opt1);
 
                 const opt2 = document.createElement('option');
                 opt2.value = y; opt2.text = y;
-                if (y === 2012) opt2.selected = true;
+                if (y === 2018) opt2.selected = true;
                 yearToSel.appendChild(opt2);
             }
             updateModels();
@@ -344,6 +344,7 @@
 
             status.innerText = `Querying live DoneDeal ${currentSection === 'damagedcars' ? 'Salvage' : 'Standard'} market...`;
 
+            // Search by model or just model keyword to catch titles like "18 Focus"
             const workerUrl = `https://pj-val-proxy.pauljordanie.workers.dev/?section=${currentSection}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
 
             let data = null;
