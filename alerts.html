@@ -514,7 +514,6 @@
             const status = document.getElementById('statusBar');
             status.innerText = `Querying live DoneDeal market...`;
 
-            // Calls the standard valuation endpoints (keeping single-search support)
             const primaryUrl = `${API_URL}/?section=${currentSection}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
             const fetchPromises = [ fetch(primaryUrl).then(r => r.ok ? r.json() : null).catch(()=>null) ];
             
