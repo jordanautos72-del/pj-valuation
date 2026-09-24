@@ -29,12 +29,12 @@
         .btn-primary { background: #0284C7; color: white; }
         .btn-sec { background: #E2E8F0; color: #334155; flex: 0.4; }
         
-        /* Alert Specific Styles */
         .btn-success { background: #16A34A; color: white; width: 100%; margin-bottom: 8px; }
-        .btn-danger { background: #DC2626; color: white; width: 100%; }
-        .alert-status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-bottom: 14px; }
-        .status-on { background: #DCFCE7; color: #166534; border: 1px solid #BBF7D0; }
-        .status-off { background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
+        
+        .active-alert-item { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .active-alert-info { font-size: 12px; font-weight: 700; color: #0F172A; }
+        .active-alert-sub { font-size: 10px; color: #64748B; margin-top: 2px; }
+        .btn-delete-alert { background: #FEE2E2; color: #DC2626; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; height: auto; flex: none; }
 
         .kpi-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
         .kpi { border-radius: 10px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
@@ -95,8 +95,12 @@
 
     <!-- AUTO ALERTS CARD -->
     <div class="card" id="alertsCard" style="display: none;">
-        <div id="alertStatusBadge" class="alert-status-badge status-off">● Scanner Inactive</div>
-        
+        <h3 style="margin-top:0; font-size:14px; color:#0F172A;">Active Background Scanners</h3>
+        <div id="activeAlertsList" style="margin-bottom: 16px;"></div>
+
+        <hr style="border:0; border-top:1px solid #E2E8F0; margin: 16px 0;">
+
+        <h3 style="margin-top:0; font-size:14px; color:#0F172A;">Add New Alert</h3>
         <div class="field-group">
             <label>Target Category</label>
             <select id="alertSection">
@@ -108,21 +112,17 @@
             <div class="field-group"><label>Make</label><select id="alertMake" onchange="updateAlertModels()"></select></div>
             <div class="field-group"><label>Model</label><select id="alertModel"></select></div>
         </div>
-        
-        <!-- NEW YEAR SELECTION ROW -->
         <div class="row-group">
             <div class="field-group"><label>Year From</label><select id="alertYearFrom"></select></div>
             <div class="field-group"><label>Year To</label><select id="alertYearTo"></select></div>
         </div>
-
         <div class="field-group">
             <label>Maximum Buy-in Price (€)</label>
             <input type="number" id="alertPrice" placeholder="e.g. 3000" value="3000">
         </div>
         
-        <div style="margin-top: 20px;">
-            <button class="btn-success" onclick="saveAlertConfig(true)">▶ Arm Scanner</button>
-            <button class="btn-danger" onclick="saveAlertConfig(false)">■ Deactivate Alerts</button>
+        <div style="margin-top: 10px;">
+            <button class="btn-success" onclick="addNewAlert()">＋ Add Alert to Scanners</button>
         </div>
         <div id="alertFeedback" style="font-size: 11px; margin-top: 10px; color: #0284C7; text-align: center;"></div>
     </div>
@@ -153,6 +153,7 @@
     <script>
         let currentSection = 'cars';
         const API_URL = 'https://pj-val-proxy.pauljordanie.workers.dev';
+        let savedAlerts = [];
 
         const models = {
             'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note'],
@@ -209,7 +210,7 @@
             document.getElementById('tabAlerts').className = section === 'alerts' ? 'nav-tab active' : 'nav-tab';
 
             if (section === 'alerts') {
-                document.getElementById('modeTitle').innerText = 'Auto Alert Config';
+                document.getElementById('modeTitle').innerText = 'Multi-Alert Scanners';
                 document.getElementById('searchCard').style.display = 'none';
                 document.getElementById('kpiDashboard').style.display = 'none';
                 document.getElementById('statusBar').style.display = 'none';
@@ -244,61 +245,80 @@
             }
         }
 
-        // --- NEW ALERT LOGIC ---
         async function loadAlertConfig() {
             try {
                 const res = await fetch(`${API_URL}/api/config`);
-                const config = await res.json();
-                const badge = document.getElementById('alertStatusBadge');
-                
-                if (config.active) {
-                    badge.className = 'alert-status-badge status-on';
-                    badge.innerText = '● Scanner Active';
-                    if (config.make) {
-                        document.getElementById('alertMake').value = config.make;
-                        updateAlertModels();
-                        document.getElementById('alertModel').value = config.model;
-                        document.getElementById('alertPrice').value = config.price;
-                        if(config.section) document.getElementById('alertSection').value = config.section;
-                        if(config.yearFrom) document.getElementById('alertYearFrom').value = config.yearFrom;
-                        if(config.yearTo) document.getElementById('alertYearTo').value = config.yearTo;
-                    }
-                } else {
-                    badge.className = 'alert-status-badge status-off';
-                    badge.innerText = '● Scanner Inactive';
-                }
-            } catch(e) { console.error("Error loading config"); }
+                const data = await res.json();
+                savedAlerts = Array.isArray(data) ? data : [];
+                renderActiveAlerts();
+            } catch(e) { savedAlerts = []; }
         }
 
-        async function saveAlertConfig(isActive) {
-            const btnState = document.getElementById('alertFeedback');
-            btnState.innerText = "Saving configuration...";
-            
-            const config = {
-                active: isActive,
+        function renderActiveAlerts() {
+            const container = document.getElementById('activeAlertsList');
+            if (savedAlerts.length === 0) {
+                container.innerHTML = '<div style="font-size:12px; color:#64748B; font-style:italic;">No active background scanners configured.</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            savedAlerts.forEach((alert, index) => {
+                const typeText = alert.section === 'cars' ? 'Standard' : 'Salvage';
+                const div = document.createElement('div');
+                div.className = 'active-alert-item';
+                div.innerHTML = `
+                    <div>
+                        <div class="active-alert-info">${alert.make} ${alert.model} (${typeText})</div>
+                        <div class="active-alert-sub">Years: ${alert.yearFrom}-${alert.yearTo} | Max: €${alert.price}</div>
+                    </div>
+                    <button class="btn-delete-alert" onclick="deleteAlert(${index})">Remove</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        async function addNewAlert() {
+            const feedback = document.getElementById('alertFeedback');
+            feedback.innerText = "Adding alert...";
+
+            const newAlert = {
+                active: true,
                 section: document.getElementById('alertSection').value,
                 make: document.getElementById('alertMake').value,
                 model: document.getElementById('alertModel').value,
-                price: document.getElementById('alertPrice').value,
                 yearFrom: document.getElementById('alertYearFrom').value,
-                yearTo: document.getElementById('alertYearTo').value
+                yearTo: document.getElementById('alertYearTo').value,
+                price: document.getElementById('alertPrice').value
             };
+
+            savedAlerts.push(newAlert);
 
             try {
                 await fetch(`${API_URL}/api/config`, {
                     method: 'POST',
-                    body: JSON.stringify(config)
+                    body: JSON.stringify(savedAlerts)
                 });
-                
-                btnState.innerText = isActive ? `Armed! Background scanner looking for ${config.make} ${config.model} (${config.yearFrom}-${config.yearTo}) under €${config.price}.` : "Alerts deactivated.";
-                setTimeout(() => btnState.innerText = '', 4000);
-                loadAlertConfig();
+                feedback.innerText = "Scanner added successfully!";
+                setTimeout(() => feedback.innerText = '', 3000);
+                renderActiveAlerts();
             } catch(e) {
-                btnState.innerText = "Error saving configuration.";
+                feedback.innerText = "Error saving alert.";
             }
         }
 
-        // --- ORIGINAL PROXY LOGIC ---
+        async function deleteAlert(index) {
+            savedAlerts.splice(index, 1);
+            try {
+                await fetch(`${API_URL}/api/config`, {
+                    method: 'POST',
+                    body: JSON.stringify(savedAlerts)
+                });
+                renderActiveAlerts();
+            } catch(e) {
+                alert("Error removing alert.");
+            }
+        }
+
         function getPercentile(arr, p) {
             if (arr.length === 0) return 0;
             return arr[Math.min(Math.floor((p / 100) * arr.length), arr.length - 1)];
@@ -310,7 +330,7 @@
             const yearFrom = document.getElementById('yearFromSelect').value;
             const yearTo = document.getElementById('yearToSelect').value;
             const status = document.getElementById('statusBar');
-            status.innerText = `Querying live DoneDeal ${currentSection === 'damagedcars' ? 'Salvage & Standard Baseline' : 'Standard'} market...`;
+            status.innerText = `Querying live DoneDeal market...`;
 
             const primaryUrl = `${API_URL}/?section=${currentSection}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
             const fetchPromises = [ fetch(primaryUrl).then(r => r.ok ? r.json() : null).catch(()=>null) ];
