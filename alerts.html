@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PJ Market Valuation & Salvage Guide</title>
+    <meta name="theme-color" content="#0F172A">
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; padding: 14px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #F1F5F9; color: #0F172A; }
+        .header { background: #0F172A; color: #FFF; padding: 16px; border-radius: 12px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { margin: 0; font-size: 16px; font-weight: 700; }
+        .header span { font-size: 11px; color: #38BDF8; font-weight: bold; }
+        
+        .nav-tabs { display: flex; background: #1E293B; border-radius: 8px; padding: 4px; margin-bottom: 14px; }
+        .nav-tab { flex: 1; padding: 10px 4px; text-align: center; color: #94A3B8; font-size: 11px; font-weight: 700; cursor: pointer; border: none; background: transparent; border-radius: 6px; }
+        .nav-tab.active { background: #FFF; color: #0F172A; }
+
+        .card { background: #FFF; border-radius: 12px; padding: 16px; margin-bottom: 14px; box-shadow: 0 2px 6px rgba(15,23,42,0.08); }
+        .field-group { margin-bottom: 12px; }
+        .field-group label { display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 5px; text-transform: uppercase; }
+        .row-group { display: flex; gap: 10px; }
+        .row-group .field-group { flex: 1; }
+        select, input { width: 100%; height: 44px; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 12px; font-size: 15px; font-weight: 600; outline: none; }
+        select:focus, input:focus { border-color: #0284C7; }
+
+        .btn-row { display: flex; gap: 8px; margin-top: 14px; }
+        button { flex: 1; height: 48px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        .btn-primary { background: #0284C7; color: white; }
+        .btn-sec { background: #E2E8F0; color: #334155; flex: 0.4; }
+        
+        /* Alert Specific Styles */
+        .btn-success { background: #16A34A; color: white; width: 100%; margin-bottom: 8px; }
+        .btn-danger { background: #DC2626; color: white; width: 100%; }
+        .alert-status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-bottom: 14px; }
+        .status-on { background: #DCFCE7; color: #166534; border: 1px solid #BBF7D0; }
+        .status-off { background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
+
+        .kpi-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+        .kpi { border-radius: 10px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+        .kpi-title { font-size: 12px; font-weight: 700; }
+        .kpi-sub { font-size: 10px; opacity: 0.8; }
+        .kpi-val { font-size: 22px; font-weight: 800; }
+        .kpi-purple { background: #FAF5FF; border: 1px solid #E9D5FF; color: #6B21A8; }
+        .kpi-green { background: #F0FDF4; border: 1px solid #BBF7D0; color: #166534; }
+        .kpi-blue { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF; }
+        .kpi-yellow { background: #FEFCE8; border: 1px solid #FEF08A; color: #854D0E; }
+
+        .status-bar { font-size: 12px; color: #475569; margin-bottom: 12px; padding: 10px 12px; background: #FFF; border-radius: 8px; border: 1px solid #E2E8F0; }
+        .listing-card { background: #FFF; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #E2E8F0; }
+        .listing-info { flex: 1; padding-right: 10px; }
+        .listing-title { font-size: 13px; font-weight: 700; color: #0F172A; margin-bottom: 4px; }
+        .listing-meta { font-size: 11px; color: #64748B; display: flex; gap: 8px; }
+        .year-badge { background: #0284C7; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 10px; }
+        .listing-repaired-col { text-align: center; padding: 0 10px; border-left: 1px solid #F1F5F9; border-right: 1px solid #F1F5F9; margin-right: 10px; }
+        .listing-repaired-lbl { font-size: 9px; color: #64748B; font-weight: 700; text-transform: uppercase; }
+        .listing-repaired-val { font-size: 13px; font-weight: 800; color: #6B21A8; }
+        .listing-price-col { text-align: right; }
+        .listing-price { font-size: 15px; font-weight: 800; color: #0284C7; margin-bottom: 4px; }
+        .btn-view { background: #0F172A; color: white; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-decoration: none; display: inline-block; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>PJ MARKET VALUATION</h1>
+        <span id="modeTitle">Standard Valuation</span>
+    </div>
+
+    <div class="nav-tabs">
+        <button class="nav-tab active" id="tabStandard" onclick="switchMode('cars')">Standard</button>
+        <button class="nav-tab" id="tabSalvage" onclick="switchMode('damagedcars')">Salvage</button>
+        <button class="nav-tab" id="tabAlerts" onclick="switchMode('alerts')">Auto Alerts</button>
+    </div>
+
+    <!-- MAIN SEARCH CARD -->
+    <div class="card" id="searchCard">
+        <div class="field-group">
+            <label>Make</label>
+            <select id="makeSelect" onchange="updateModels()"></select>
+        </div>
+        <div class="field-group">
+            <label>Model</label>
+            <select id="modelSelect"></select>
+        </div>
+        <div class="row-group">
+            <div class="field-group"><label>Year From</label><select id="yearFromSelect"></select></div>
+            <div class="field-group"><label>Year To</label><select id="yearToSelect"></select></div>
+        </div>
+        <div class="btn-row">
+            <button class="btn-primary" onclick="lookupVehicle(false)">🔍 Check Market</button>
+            <button class="btn-sec" onclick="lookupVehicle(true)">⚡ Live</button>
+        </div>
+    </div>
+
+    <!-- AUTO ALERTS CARD -->
+    <div class="card" id="alertsCard" style="display: none;">
+        <div id="alertStatusBadge" class="alert-status-badge status-off">● Scanner Inactive</div>
+        
+        <div class="field-group">
+            <label>Target Category</label>
+            <select id="alertSection">
+                <option value="damagedcars">Damaged / Salvage (Prep Projects)</option>
+                <option value="cars">Standard Market (Ready to Drive)</option>
+            </select>
+        </div>
+        <div class="row-group">
+            <div class="field-group"><label>Make</label><select id="alertMake" onchange="updateAlertModels()"></select></div>
+            <div class="field-group"><label>Model</label><select id="alertModel"></select></div>
+        </div>
+        <div class="field-group">
+            <label>Maximum Buy-in Price (€)</label>
+            <input type="number" id="alertPrice" placeholder="e.g. 3000" value="3000">
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <button class="btn-success" onclick="saveAlertConfig(true)">▶ Arm Scanner</button>
+            <button class="btn-danger" onclick="saveAlertConfig(false)">■ Deactivate Alerts</button>
+        </div>
+        <div id="alertFeedback" style="font-size: 11px; margin-top: 10px; color: #0284C7; text-align: center;"></div>
+    </div>
+
+    <!-- KPI DASHBOARD -->
+    <div class="kpi-container" id="kpiDashboard">
+        <div class="kpi kpi-purple" id="kpiRepaired" style="display: none;">
+            <div><div class="kpi-title">EST. REPAIRED VALUE</div><div class="kpi-sub">Standard Market Average</div></div>
+            <div class="kpi-val" id="statRepaired">€0</div>
+        </div>
+        <div class="kpi kpi-green">
+            <div><div class="kpi-title" id="lblHigh">DEALER / RETAIL (MINT)</div><div class="kpi-sub" id="subHigh">Clean NCT / Forecourt Guide</div></div>
+            <div class="kpi-val" id="statHigh">€0</div>
+        </div>
+        <div class="kpi kpi-blue">
+            <div><div class="kpi-title" id="lblAvg">MARKET AVERAGE</div><div class="kpi-sub" id="subAvg">Typical Asking Price</div></div>
+            <div class="kpi-val" id="statAvg">€0</div>
+        </div>
+        <div class="kpi kpi-yellow">
+            <div><div class="kpi-title" id="lblLow">TRADE / BUY TARGET</div><div class="kpi-sub" id="subLow">Short NCT / Prep Project</div></div>
+            <div class="kpi-val" id="statLow">€0</div>
+        </div>
+    </div>
+
+    <div class="status-bar" id="statusBar">Ready. Select vehicle and tap Check Market.</div>
+    <div id="listingsList"></div>
+
+    <script>
+        let currentSection = 'cars';
+        const API_URL = 'https://pj-val-proxy.pauljordanie.workers.dev';
+
+        const models = {
+            'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note'],
+            'Ford': ['Focus', 'Fiesta', 'Mondeo', 'Kuga', 'Transit Connect'],
+            'Volkswagen': ['Golf', 'Passat', 'Polo', 'Tiguan', 'Caddy'],
+            'Peugeot': ['208', '308', '2008', '3008', '5008', '508'],
+            'Hyundai': ['Tucson', 'i30', 'i40', 'Santa Fe', 'Kona'],
+            'Citroen': ['C3', 'C4', 'Berlingo', 'C4 Cactus']
+        };
+
+        function initDropdowns() {
+            const makes = Object.keys(models);
+            const mSel = document.getElementById('makeSelect');
+            const aSel = document.getElementById('alertMake');
+            
+            makes.forEach(m => {
+                mSel.appendChild(new Option(m, m));
+                aSel.appendChild(new Option(m, m));
+            });
+
+            const yFrom = document.getElementById('yearFromSelect');
+            const yTo = document.getElementById('yearToSelect');
+            for (let y = new Date().getFullYear(); y >= 2006; y--) {
+                yFrom.appendChild(new Option(y, y, false, y === 2018));
+                yTo.appendChild(new Option(y, y, false, y === 2018));
+            }
+            updateModels();
+            updateAlertModels();
+            loadAlertConfig();
+        }
+
+        function updateModels() {
+            const make = document.getElementById('makeSelect').value;
+            const modelSel = document.getElementById('modelSelect');
+            modelSel.innerHTML = '';
+            models[make].forEach(m => modelSel.appendChild(new Option(m, m)));
+        }
+
+        function updateAlertModels() {
+            const make = document.getElementById('alertMake').value;
+            const modelSel = document.getElementById('alertModel');
+            modelSel.innerHTML = '';
+            models[make].forEach(m => modelSel.appendChild(new Option(m, m)));
+        }
+
+        function switchMode(section) {
+            document.getElementById('tabStandard').className = section === 'cars' ? 'nav-tab active' : 'nav-tab';
+            document.getElementById('tabSalvage').className = section === 'damagedcars' ? 'nav-tab active' : 'nav-tab';
+            document.getElementById('tabAlerts').className = section === 'alerts' ? 'nav-tab active' : 'nav-tab';
+
+            if (section === 'alerts') {
+                document.getElementById('modeTitle').innerText = 'Auto Alert Config';
+                document.getElementById('searchCard').style.display = 'none';
+                document.getElementById('kpiDashboard').style.display = 'none';
+                document.getElementById('statusBar').style.display = 'none';
+                document.getElementById('listingsList').style.display = 'none';
+                document.getElementById('alertsCard').style.display = 'block';
+                loadAlertConfig();
+            } else {
+                currentSection = section;
+                document.getElementById('modeTitle').innerText = section === 'cars' ? 'Standard Valuation' : 'Damaged / Salvage';
+                document.getElementById('searchCard').style.display = 'block';
+                document.getElementById('kpiDashboard').style.display = 'flex';
+                document.getElementById('statusBar').style.display = 'block';
+                document.getElementById('listingsList').style.display = 'block';
+                document.getElementById('alertsCard').style.display = 'none';
+                
+                document.getElementById('kpiRepaired').style.display = section === 'damagedcars' ? 'flex' : 'none';
+                if (section === 'damagedcars') {
+                    document.getElementById('lblHigh').innerText = 'HIGHEST SALVAGE ASKING';
+                    document.getElementById('subHigh').innerText = 'Minor Damage / High Spec';
+                    document.getElementById('lblAvg').innerText = 'AVERAGE REPAIRABLE ASKING';
+                    document.getElementById('subAvg').innerText = 'Median Salvage Price';
+                    document.getElementById('lblLow').innerText = 'LOWEST SALVAGE BUY-IN';
+                    document.getElementById('subLow').innerText = 'Bottom 15th %ile Target';
+                } else {
+                    document.getElementById('lblHigh').innerText = 'DEALER / RETAIL (MINT)';
+                    document.getElementById('subHigh').innerText = 'Clean NCT / Forecourt Guide';
+                    document.getElementById('lblAvg').innerText = 'MARKET AVERAGE';
+                    document.getElementById('subAvg').innerText = 'Typical Asking Price';
+                    document.getElementById('lblLow').innerText = 'TRADE / BUY TARGET';
+                    document.getElementById('subLow').innerText = 'Short NCT / Prep Project';
+                }
+            }
+        }
+
+        // --- NEW ALERT LOGIC ---
+        async function loadAlertConfig() {
+            try {
+                const res = await fetch(`${API_URL}/api/config`);
+                const config = await res.json();
+                const badge = document.getElementById('alertStatusBadge');
+                
+                if (config.active) {
+                    badge.className = 'alert-status-badge status-on';
+                    badge.innerText = '● Scanner Active';
+                    if (config.make) {
+                        document.getElementById('alertMake').value = config.make;
+                        updateAlertModels();
+                        document.getElementById('alertModel').value = config.model;
+                        document.getElementById('alertPrice').value = config.price;
+                        if(config.section) document.getElementById('alertSection').value = config.section;
+                    }
+                } else {
+                    badge.className = 'alert-status-badge status-off';
+                    badge.innerText = '● Scanner Inactive';
+                }
+            } catch(e) { console.error("Error loading config"); }
+        }
+
+        async function saveAlertConfig(isActive) {
+            const btnState = document.getElementById('alertFeedback');
+            btnState.innerText = "Saving configuration...";
+            
+            const config = {
+                active: isActive,
+                section: document.getElementById('alertSection').value,
+                make: document.getElementById('alertMake').value,
+                model: document.getElementById('alertModel').value,
+                price: document.getElementById('alertPrice').value
+            };
+
+            try {
+                await fetch(`${API_URL}/api/config`, {
+                    method: 'POST',
+                    body: JSON.stringify(config)
+                });
+                
+                btnState.innerText = isActive ? `Armed! Background scanner looking for ${config.make} ${config.model} under €${config.price}.` : "Alerts deactivated.";
+                setTimeout(() => btnState.innerText = '', 4000);
+                loadAlertConfig();
+            } catch(e) {
+                btnState.innerText = "Error saving configuration.";
+            }
+        }
+
+        // --- ORIGINAL PROXY LOGIC ---
+        function getPercentile(arr, p) {
+            if (arr.length === 0) return 0;
+            return arr[Math.min(Math.floor((p / 100) * arr.length), arr.length - 1)];
+        }
+
+        async function lookupVehicle(forceFresh) {
+            const make = document.getElementById('makeSelect').value;
+            const model = document.getElementById('modelSelect').value;
+            const yearFrom = document.getElementById('yearFromSelect').value;
+            const yearTo = document.getElementById('yearToSelect').value;
+            const status = document.getElementById('statusBar');
+            status.innerText = `Querying live DoneDeal ${currentSection === 'damagedcars' ? 'Salvage & Standard Baseline' : 'Standard'} market...`;
+
+            const primaryUrl = `${API_URL}/?section=${currentSection}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
+            const fetchPromises = [ fetch(primaryUrl).then(r => r.ok ? r.json() : null).catch(()=>null) ];
+            
+            let stdIndex = -1, stdAvg = 0;
+            if (currentSection === 'damagedcars') {
+                const stdUrl = `${API_URL}/?section=cars&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
+                stdIndex = fetchPromises.length;
+                fetchPromises.push(fetch(stdUrl).then(r => r.ok ? r.json() : null).catch(()=>null));
+            }
+
+            const results = await Promise.all(fetchPromises);
+            const data = results[0];
+
+            if (stdIndex !== -1 && results[stdIndex] && results[stdIndex].ads) {
+                let stdPrices = [];
+                results[stdIndex].ads.forEach(ad => {
+                    let p = parseFloat((ad.price||"").replace(/[^0-9.]/g, ''))||0;
+                    if (p >= 400) stdPrices.push(p);
+                });
+                if (stdPrices.length > 0) {
+                    stdPrices.sort((a,b) => a - b);
+                    stdAvg = getPercentile(stdPrices, 50);
+                }
+            }
+
+            if (!data || !data.ads || data.ads.length === 0) {
+                status.innerText = `No listings returned via worker bridge.`;
+                return;
+            }
+
+            let listings = [];
+            let prices = [];
+            const minP = currentSection === 'damagedcars' ? 150 : 400;
+
+            data.ads.forEach(ad => {
+                let priceNum = parseFloat((ad.price||"").replace(/[^0-9.]/g, '')) || 0;
+                if (priceNum >= minP) {
+                    let adUrl = ad.friendlyUrl ? (ad.friendlyUrl.startsWith('http') ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`) : `https://www.donedeal.ie/${currentSection}-for-sale/view/${ad.id}`;
+                    let adYear = ad.year || yearFrom;
+                    if (!ad.year) {
+                        const yearMatch = (ad.header || "").match(/\b(20[0-2][0-9])\b/);
+                        if (yearMatch) adYear = yearMatch[1];
+                    }
+                    listings.push({ title: ad.header, year: adYear, price: priceNum, location: ad.county || 'Ireland', url: adUrl });
+                    prices.push(priceNum);
+                }
+            });
+
+            if (prices.length === 0) { status.innerText = 'No realistic asking prices found.'; return; }
+            prices.sort((a, b) => a - b);
+            
+            document.getElementById('statHigh').innerText = '€' + Math.round(getPercentile(prices, 85)).toLocaleString();
+            document.getElementById('statAvg').innerText = '€' + Math.round(getPercentile(prices, 50)).toLocaleString();
+            document.getElementById('statLow').innerText = '€' + Math.round(getPercentile(prices, 15)).toLocaleString();
+            if (currentSection === 'damagedcars') document.getElementById('statRepaired').innerText = stdAvg > 0 ? '€' + Math.round(stdAvg).toLocaleString() : 'N/A';
+
+            const container = document.getElementById('listingsList');
+            container.innerHTML = '';
+            listings.sort((a, b) => b.price - a.price).forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'listing-card';
+                let midCol = currentSection === 'damagedcars' && stdAvg > 0 ? `<div class="listing-repaired-col"><div class="listing-repaired-lbl">RepAvg</div><div class="listing-repaired-val">€${Math.round(stdAvg).toLocaleString()}</div></div>` : '';
+                div.innerHTML = `<div class="listing-info"><div class="listing-title">${item.title}</div><div class="listing-meta"><span class="year-badge">${item.year}</span><span>📍 ${item.location}</span></div></div>${midCol}<div class="listing-price-col"><div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>${item.url ? `<a href="${item.url}" target="_blank" class="btn-view">View Ad ↗</a>` : ''}</div>`;
+                container.appendChild(div);
+            });
+            status.innerText = `Market guide updated (${prices.length} vehicles found).`;
+        }
+
+        initDropdowns();
+    </script>
+</body>
+</html>
