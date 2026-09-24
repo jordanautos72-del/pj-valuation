@@ -70,6 +70,11 @@
         .listing-price-col { text-align: right; }
         .listing-price { font-size: 15px; font-weight: 800; color: #0284C7; margin-bottom: 4px; }
         .btn-view { background: #0F172A; color: white; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-decoration: none; display: inline-block; }
+        
+        /* New Date Column CSS */
+        .listing-date-col { text-align: center; padding: 0 10px; border-left: 1px solid #F1F5F9; border-right: 1px solid #F1F5F9; margin-right: 10px; }
+        .listing-date-lbl { font-size: 9px; color: #64748B; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+        .listing-date-val { font-size: 11px; font-weight: 800; color: #0F172A; }
     </style>
 </head>
 <body>
@@ -348,11 +353,14 @@
                             <div class="listing-meta">
                                 <span class="year-badge">${item.year}</span>
                                 <span>📍 ${item.location}</span>
-                                <span>📅 ${item.publishedDate || 'Recent'}</span>
                             </div>
                             <div class="listing-meta" style="margin-top: 4px;">
                                 <span style="color:#0284C7; font-weight:bold;">[${item.searchProfile}]</span>
                             </div>
+                        </div>
+                        <div class="listing-date-col">
+                            <div class="listing-date-lbl">Posted</div>
+                            <div class="listing-date-val">${item.publishedDate || 'Recent'}</div>
                         </div>
                         <div class="listing-price-col">
                             <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
@@ -565,7 +573,6 @@
                         if (yearMatch) adYear = yearMatch[1];
                     }
 
-                    // Format the Publish Date
                     let pubDateStr = "Recent";
                     if (ad.publishDate) {
                         let d = new Date(ad.publishDate);
@@ -616,8 +623,11 @@
                         <div class="listing-meta">
                             <span class="year-badge">${item.year}</span>
                             <span>📍 ${item.location}</span>
-                            <span>📅 ${item.date}</span>
                         </div>
+                    </div>
+                    <div class="listing-date-col">
+                        <div class="listing-date-lbl">Posted</div>
+                        <div class="listing-date-val">${item.date}</div>
                     </div>
                     ${midCol}
                     <div class="listing-price-col">
