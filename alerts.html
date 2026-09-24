@@ -168,12 +168,12 @@
     <!-- MARGIN & REPAIR CALCULATOR BOX -->
     <div class="calculator-card" id="marginCalcCard">
         <div class="calc-title">
-            <span>⚙️ Trade Buy-In & Margin Calculator</span>
-            <span style="font-size: 10px; color: #64748B;">Based on Market Avg</span>
+            <span id="calcTitleText">⚙️ Trade Buy-In & Margin Calculator</span>
+            <span style="font-size: 10px; color: #64748B;" id="calcSubText">Based on Market Avg</span>
         </div>
         <div class="calc-row">
             <div class="field-group">
-                <label>Est. Parts / Repairs (€)</label>
+                <label id="calcCostLabel">Est. Parts / Repairs (€)</label>
                 <input type="number" id="calcRepairCost" value="800" oninput="calculateTradeMargin()">
             </div>
             <div class="field-group">
@@ -182,7 +182,7 @@
             </div>
         </div>
         <div class="calc-result">
-            <span class="calc-result-lbl">MAX SAFE BUY-IN CEILING</span>
+            <span class="calc-result-lbl" id="calcResultLbl">MAX SAFE BUY-IN CEILING</span>
             <span class="calc-result-val" id="calcMaxBuyIn">€0</span>
         </div>
     </div>
@@ -196,6 +196,7 @@
         let savedAlerts = [];
         let editingIndex = null;
         let currentMarketAvg = 0;
+        let currentRepairedAvg = 0;
 
         const models = {
             'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note'],
@@ -270,7 +271,8 @@
                 document.getElementById('listingsList').style.display = 'block';
                 document.getElementById('alertsCard').style.display = 'none';
                 
-                document.getElementById('marginCalcCard').style.display = section === 'cars' ? 'block' : 'none';
+                // Show calculator on both Standard and Salvage tabs
+                document.getElementById('marginCalcCard').style.display = 'block';
                 document.getElementById('kpiRepaired').style.display = section === 'damagedcars' ? 'flex' : 'none';
 
                 if (section === 'damagedcars') {
@@ -280,6 +282,12 @@
                     document.getElementById('subAvg').innerText = 'Median Salvage Price';
                     document.getElementById('lblLow').innerText = 'LOWEST SALVAGE BUY-IN';
                     document.getElementById('subLow').innerText = 'Bottom 15th %ile Target';
+
+                    // Update Calculator text for Salvage mode
+                    document.getElementById('calcTitleText').innerText = '⚙️ Salvage Max Buy-In Calculator';
+                    document.getElementById('calcSubText').innerText = 'Based on Repaired Market Value';
+                    document.getElementById('calcCostLabel').innerText = 'Est. Repairs & Parts (€)';
+                    document.getElementById('calcResultLbl').innerText = 'MAX SAFE SALVAGE BUY-IN';
                 } else {
                     document.getElementById('lblHigh').innerText = 'DEALER / RETAIL (MINT)';
                     document.getElementById('subHigh').innerText = 'Clean NCT / Forecourt Guide';
@@ -287,7 +295,14 @@
                     document.getElementById('subAvg').innerText = 'Typical Asking Price';
                     document.getElementById('lblLow').innerText = 'TRADE / BUY TARGET';
                     document.getElementById('subLow').innerText = 'Short NCT / Prep Project';
+
+                    // Update Calculator text for Standard mode
+                    document.getElementById('calcTitleText').innerText = '⚙️ Trade Buy-In & Margin Calculator';
+                    document.getElementById('calcSubText').innerText = 'Based on Market Avg';
+                    document.getElementById('calcCostLabel').innerText = 'Est. Parts / Repairs (€)';
+                    document.getElementById('calcResultLbl').innerText = 'MAX SAFE BUY-IN CEILING';
                 }
+                calculateTradeMargin();
             }
         }
 
@@ -326,10 +341,17 @@
         }
 
         function calculateTradeMargin() {
-            if (currentMarketAvg <= 0) return;
             const repairs = parseFloat(document.getElementById('calcRepairCost').value) || 0;
             const profit = parseFloat(document.getElementById('calcTargetProfit').value) || 0;
-            const maxBuyIn = currentMarketAvg - repairs - profit;
+            
+            let baseValue = currentSection === 'damagedcars' ? currentRepairedAvg : currentMarketAvg;
+            
+            if (baseValue <= 0) {
+                document.getElementById('calcMaxBuyIn').innerText = '€0 (Run Check Market first)';
+                return;
+            }
+
+            const maxBuyIn = baseValue - repairs - profit;
             document.getElementById('calcMaxBuyIn').innerText = maxBuyIn > 0 ? '€' + Math.round(maxBuyIn).toLocaleString() : '€0 (Too tight)';
         }
 
@@ -522,10 +544,13 @@
             prices.sort((a, b) => a - b);
             
             const marketAvgVal = getPercentile(prices, 50);
+            
             if (currentSection === 'cars') {
                 currentMarketAvg = marketAvgVal;
-                calculateTradeMargin();
+            } else if (currentSection === 'damagedcars') {
+                currentRepairedAvg = stdAvg; // Use standard market average as the repaired ceiling for salvage
             }
+            calculateTradeMargin();
 
             document.getElementById('statHigh').innerText = '€' + Math.round(getPercentile(prices, 85)).toLocaleString();
             document.getElementById('statAvg').innerText = '€' + Math.round(marketAvgVal).toLocaleString();
