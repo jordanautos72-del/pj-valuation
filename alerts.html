@@ -108,6 +108,13 @@
             <div class="field-group"><label>Make</label><select id="alertMake" onchange="updateAlertModels()"></select></div>
             <div class="field-group"><label>Model</label><select id="alertModel"></select></div>
         </div>
+        
+        <!-- NEW YEAR SELECTION ROW -->
+        <div class="row-group">
+            <div class="field-group"><label>Year From</label><select id="alertYearFrom"></select></div>
+            <div class="field-group"><label>Year To</label><select id="alertYearTo"></select></div>
+        </div>
+
         <div class="field-group">
             <label>Maximum Buy-in Price (€)</label>
             <input type="number" id="alertPrice" placeholder="e.g. 3000" value="3000">
@@ -168,9 +175,14 @@
 
             const yFrom = document.getElementById('yearFromSelect');
             const yTo = document.getElementById('yearToSelect');
+            const aYFrom = document.getElementById('alertYearFrom');
+            const aYTo = document.getElementById('alertYearTo');
+
             for (let y = new Date().getFullYear(); y >= 2006; y--) {
                 yFrom.appendChild(new Option(y, y, false, y === 2018));
                 yTo.appendChild(new Option(y, y, false, y === 2018));
+                aYFrom.appendChild(new Option(y, y, false, y === 2010));
+                aYTo.appendChild(new Option(y, y, false, y === new Date().getFullYear()));
             }
             updateModels();
             updateAlertModels();
@@ -248,6 +260,8 @@
                         document.getElementById('alertModel').value = config.model;
                         document.getElementById('alertPrice').value = config.price;
                         if(config.section) document.getElementById('alertSection').value = config.section;
+                        if(config.yearFrom) document.getElementById('alertYearFrom').value = config.yearFrom;
+                        if(config.yearTo) document.getElementById('alertYearTo').value = config.yearTo;
                     }
                 } else {
                     badge.className = 'alert-status-badge status-off';
@@ -265,7 +279,9 @@
                 section: document.getElementById('alertSection').value,
                 make: document.getElementById('alertMake').value,
                 model: document.getElementById('alertModel').value,
-                price: document.getElementById('alertPrice').value
+                price: document.getElementById('alertPrice').value,
+                yearFrom: document.getElementById('alertYearFrom').value,
+                yearTo: document.getElementById('alertYearTo').value
             };
 
             try {
@@ -274,7 +290,7 @@
                     body: JSON.stringify(config)
                 });
                 
-                btnState.innerText = isActive ? `Armed! Background scanner looking for ${config.make} ${config.model} under €${config.price}.` : "Alerts deactivated.";
+                btnState.innerText = isActive ? `Armed! Background scanner looking for ${config.make} ${config.model} (${config.yearFrom}-${config.yearTo}) under €${config.price}.` : "Alerts deactivated.";
                 setTimeout(() => btnState.innerText = '', 4000);
                 loadAlertConfig();
             } catch(e) {
