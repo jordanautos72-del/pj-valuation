@@ -127,9 +127,15 @@
             <div class="field-group"><label>Year From</label><select id="alertYearFrom"></select></div>
             <div class="field-group"><label>Year To</label><select id="alertYearTo"></select></div>
         </div>
-        <div class="field-group">
-            <label>Maximum Buy-in Price (€)</label>
-            <input type="number" id="alertPrice" placeholder="e.g. 3000" value="3000">
+        <div class="row-group">
+            <div class="field-group">
+                <label>Min Buy-in Price (€)</label>
+                <input type="number" id="alertMinPrice" placeholder="e.g. 500" value="500">
+            </div>
+            <div class="field-group">
+                <label>Max Buy-in Price (€)</label>
+                <input type="number" id="alertPrice" placeholder="e.g. 3000" value="3000">
+            </div>
         </div>
         
         <div style="margin-top: 10px; display: flex; gap: 8px;" id="formBtnRow">
@@ -271,7 +277,6 @@
                 document.getElementById('listingsList').style.display = 'block';
                 document.getElementById('alertsCard').style.display = 'none';
                 
-                // Show calculator on both Standard and Salvage tabs
                 document.getElementById('marginCalcCard').style.display = 'block';
                 document.getElementById('kpiRepaired').style.display = section === 'damagedcars' ? 'flex' : 'none';
 
@@ -283,7 +288,6 @@
                     document.getElementById('lblLow').innerText = 'LOWEST SALVAGE BUY-IN';
                     document.getElementById('subLow').innerText = 'Bottom 15th %ile Target';
 
-                    // Update Calculator text for Salvage mode
                     document.getElementById('calcTitleText').innerText = '⚙️ Salvage Max Buy-In Calculator';
                     document.getElementById('calcSubText').innerText = 'Based on Repaired Market Value';
                     document.getElementById('calcCostLabel').innerText = 'Est. Repairs & Parts (€)';
@@ -296,7 +300,6 @@
                     document.getElementById('lblLow').innerText = 'TRADE / BUY TARGET';
                     document.getElementById('subLow').innerText = 'Short NCT / Prep Project';
 
-                    // Update Calculator text for Standard mode
                     document.getElementById('calcTitleText').innerText = '⚙️ Trade Buy-In & Margin Calculator';
                     document.getElementById('calcSubText').innerText = 'Based on Market Avg';
                     document.getElementById('calcCostLabel').innerText = 'Est. Parts / Repairs (€)';
@@ -374,12 +377,13 @@
             container.innerHTML = '';
             savedAlerts.forEach((alert, index) => {
                 const typeText = alert.section === 'cars' ? 'Standard' : 'Salvage';
+                const minP = alert.minPrice ? `Min: €${alert.minPrice} | ` : '';
                 const div = document.createElement('div');
                 div.className = 'active-alert-item';
                 div.innerHTML = `
                     <div>
                         <div class="active-alert-info">${alert.make} ${alert.model} (${typeText})</div>
-                        <div class="active-alert-sub">Years: ${alert.yearFrom}-${alert.yearTo} | Max: €${alert.price}</div>
+                        <div class="active-alert-sub">Years: ${alert.yearFrom}-${alert.yearTo} | ${minP}Max: €${alert.price}</div>
                     </div>
                     <div class="alert-actions">
                         <button class="btn-edit-alert" onclick="editAlert(${index})">Edit</button>
@@ -400,6 +404,7 @@
             document.getElementById('alertModel').value = alert.model;
             document.getElementById('alertYearFrom').value = alert.yearFrom;
             document.getElementById('alertYearTo').value = alert.yearTo;
+            document.getElementById('alertMinPrice').value = alert.minPrice || 500;
             document.getElementById('alertPrice').value = alert.price;
 
             document.getElementById('formTitle').innerText = 'Edit Active Alert';
@@ -438,6 +443,7 @@
                 model: document.getElementById('alertModel').value,
                 yearFrom: document.getElementById('alertYearFrom').value,
                 yearTo: document.getElementById('alertYearTo').value,
+                minPrice: document.getElementById('alertMinPrice').value,
                 price: document.getElementById('alertPrice').value
             };
 
@@ -548,7 +554,7 @@
             if (currentSection === 'cars') {
                 currentMarketAvg = marketAvgVal;
             } else if (currentSection === 'damagedcars') {
-                currentRepairedAvg = stdAvg; // Use standard market average as the repaired ceiling for salvage
+                currentRepairedAvg = stdAvg;
             }
             calculateTradeMargin();
 
