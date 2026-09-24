@@ -34,6 +34,9 @@
         .active-alert-item { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
         .active-alert-info { font-size: 12px; font-weight: 700; color: #0F172A; }
         .active-alert-sub { font-size: 10px; color: #64748B; margin-top: 2px; }
+        
+        .alert-actions { display: flex; gap: 6px; }
+        .btn-edit-alert { background: #E0F2FE; color: #0284C7; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; height: auto; flex: none; }
         .btn-delete-alert { background: #FEE2E2; color: #DC2626; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; height: auto; flex: none; }
 
         .kpi-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
@@ -100,7 +103,7 @@
 
         <hr style="border:0; border-top:1px solid #E2E8F0; margin: 16px 0;">
 
-        <h3 style="margin-top:0; font-size:14px; color:#0F172A;">Add New Alert</h3>
+        <h3 id="formTitle" style="margin-top:0; font-size:14px; color:#0F172A;">Add New Alert</h3>
         <div class="field-group">
             <label>Target Category</label>
             <select id="alertSection">
@@ -121,8 +124,8 @@
             <input type="number" id="alertPrice" placeholder="e.g. 3000" value="3000">
         </div>
         
-        <div style="margin-top: 10px;">
-            <button class="btn-success" onclick="addNewAlert()">＋ Add Alert to Scanners</button>
+        <div style="margin-top: 10px; display: flex; gap: 8px;" id="formBtnRow">
+            <button class="btn-success" id="saveAlertBtn" onclick="saveAlert()">＋ Add Alert to Scanners</button>
         </div>
         <div id="alertFeedback" style="font-size: 11px; margin-top: 10px; color: #0284C7; text-align: center;"></div>
     </div>
@@ -154,6 +157,7 @@
         let currentSection = 'cars';
         const API_URL = 'https://pj-val-proxy.pauljordanie.workers.dev';
         let savedAlerts = [];
+        let editingIndex = null; // Tracks which alert is currently being edited
 
         const models = {
             'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note'],
@@ -271,17 +275,58 @@
                         <div class="active-alert-info">${alert.make} ${alert.model} (${typeText})</div>
                         <div class="active-alert-sub">Years: ${alert.yearFrom}-${alert.yearTo} | Max: €${alert.price}</div>
                     </div>
-                    <button class="btn-delete-alert" onclick="deleteAlert(${index})">Remove</button>
+                    <div class="alert-actions">
+                        <button class="btn-edit-alert" onclick="editAlert(${index})">Edit</button>
+                        <button class="btn-delete-alert" onclick="deleteAlert(${index})">Remove</button>
+                    </div>
                 `;
                 container.appendChild(div);
             });
         }
 
-        async function addNewAlert() {
-            const feedback = document.getElementById('alertFeedback');
-            feedback.innerText = "Adding alert...";
+        function editAlert(index) {
+            const alert = savedAlerts[index];
+            editingIndex = index;
 
-            const newAlert = {
+            document.getElementById('alertSection').value = alert.section;
+            document.getElementById('alertMake').value = alert.make;
+            updateAlertModels();
+            document.getElementById('alertModel').value = alert.model;
+            document.getElementById('alertYearFrom').value = alert.yearFrom;
+            document.getElementById('alertYearTo').value = alert.yearTo;
+            document.getElementById('alertPrice').value = alert.price;
+
+            document.getElementById('formTitle').innerText = 'Edit Active Alert';
+            document.getElementById('saveAlertBtn').innerText = '💾 Update Alert';
+            
+            // Add a cancel button if not already present
+            if (!document.getElementById('cancelEditBtn')) {
+                const btnRow = document.getElementById('formBtnRow');
+                const cancelBtn = document.createElement('button');
+                cancelBtn.id = 'cancelEditBtn';
+                cancelBtn.className = 'btn-sec';
+                cancelBtn.style.flex = '0.5';
+                cancelBtn.innerText = 'Cancel';
+                cancelBtn.onclick = resetAlertForm;
+                btnRow.appendChild(cancelBtn);
+            }
+
+            window.scrollTo({ top: document.getElementById('formTitle').offsetTop - 20, behavior: 'smooth' });
+        }
+
+        function resetAlertForm() {
+            editingIndex = null;
+            document.getElementById('formTitle').innerText = 'Add New Alert';
+            document.getElementById('saveAlertBtn').innerText = '＋ Add Alert to Scanners';
+            const cancelBtn = document.getElementById('cancelEditBtn');
+            if (cancelBtn) cancelBtn.remove();
+        }
+
+        async function saveAlert() {
+            const feedback = document.getElementById('alertFeedback');
+            feedback.innerText = editingIndex !== null ? "Updating alert..." : "Adding alert...";
+
+            const alertData = {
                 active: true,
                 section: document.getElementById('alertSection').value,
                 make: document.getElementById('alertMake').value,
@@ -291,15 +336,20 @@
                 price: document.getElementById('alertPrice').value
             };
 
-            savedAlerts.push(newAlert);
+            if (editingIndex !== null) {
+                savedAlerts[editingIndex] = alertData;
+            } else {
+                savedAlerts.push(alertData);
+            }
 
             try {
                 await fetch(`${API_URL}/api/config`, {
                     method: 'POST',
                     body: JSON.stringify(savedAlerts)
                 });
-                feedback.innerText = "Scanner added successfully!";
+                feedback.innerText = editingIndex !== null ? "Alert updated successfully!" : "Scanner added successfully!";
                 setTimeout(() => feedback.innerText = '', 3000);
+                resetAlertForm();
                 renderActiveAlerts();
             } catch(e) {
                 feedback.innerText = "Error saving alert.";
@@ -307,6 +357,9 @@
         }
 
         async function deleteAlert(index) {
+            if (editingIndex === index) {
+                resetAlertForm();
+            }
             savedAlerts.splice(index, 1);
             try {
                 await fetch(`${API_URL}/api/config`, {
