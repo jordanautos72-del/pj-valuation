@@ -29,6 +29,7 @@
         .btn-primary { background: #0284C7; color: white; }
         .btn-sec { background: #E2E8F0; color: #334155; flex: 0.4; }
         .btn-success { background: #16A34A; color: white; width: 100%; margin-bottom: 8px; }
+        .btn-danger-outline { background: #FFF; border: 1px solid #EF4444; color: #EF4444; width: 100%; margin-top: 10px; }
         
         .active-alert-item { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
         .active-alert-info { font-size: 12px; font-weight: 700; color: #0F172A; }
@@ -108,6 +109,9 @@
     <div class="card" id="alertsCard" style="display: none;">
         <h3 style="margin-top:0; font-size:14px; color:#0F172A;">Active Background Scanners</h3>
         <div id="activeAlertsList" style="margin-bottom: 16px;"></div>
+
+        <button class="btn-danger-outline" onclick="clearAlertCache()">🔄 Clear Sent-Ad Cache & Re-run</button>
+        <div id="cacheFeedback" style="font-size: 11px; margin-top: 6px; color: #EF4444; text-align: center;"></div>
 
         <hr style="border:0; border-top:1px solid #E2E8F0; margin: 16px 0;">
 
@@ -300,6 +304,24 @@
                     document.getElementById('calcResultLbl').innerText = 'MAX SAFE BUY-IN CEILING';
                 }
                 calculateTradeMargin();
+            }
+        }
+
+        async function clearAlertCache() {
+            const feedback = document.getElementById('cacheFeedback');
+            feedback.innerText = "Clearing sent-ad history...";
+            try {
+                const res = await fetch(`${API_URL}/api/clear-cache`);
+                const data = await res.json();
+                if (data.success) {
+                    feedback.innerText = "Cache cleared! Re-scanning...";
+                    setTimeout(() => feedback.innerText = '', 3000);
+                    triggerInstantScan();
+                } else {
+                    feedback.innerText = "Failed to clear cache.";
+                }
+            } catch(e) {
+                feedback.innerText = "Error clearing cache.";
             }
         }
 
