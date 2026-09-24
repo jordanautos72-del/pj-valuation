@@ -47,7 +47,6 @@
         .kpi-blue { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF; }
         .kpi-yellow { background: #FEFCE8; border: 1px solid #FEF08A; color: #854D0E; }
 
-        /* Margin Calculator Box */
         .calculator-card { background: #FFF; border: 1px solid #CBD5E1; border-radius: 10px; padding: 14px; margin-bottom: 14px; display: none; }
         .calc-title { font-size: 12px; font-weight: 700; color: #334155; text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .calc-row { display: flex; gap: 8px; margin-bottom: 8px; }
@@ -109,6 +108,13 @@
     <div class="card" id="alertsCard" style="display: none;">
         <h3 style="margin-top:0; font-size:14px; color:#0F172A;">Active Background Scanners</h3>
         <div id="activeAlertsList" style="margin-bottom: 16px;"></div>
+
+        <hr style="border:0; border-top:1px solid #E2E8F0; margin: 16px 0;">
+
+        <h3 style="margin-top:0; font-size:14px; color:#166534;">⚡ Live Matching Vehicles Found</h3>
+        <div id="matchedListingsFeed" style="margin-bottom: 16px;">
+            <div style="font-size: 12px; color: #64748B; font-style: italic;">Scanning active profiles...</div>
+        </div>
 
         <hr style="border:0; border-top:1px solid #E2E8F0; margin: 16px 0;">
 
@@ -189,7 +195,7 @@
         const API_URL = 'https://pj-val-proxy.pauljordanie.workers.dev';
         let savedAlerts = [];
         let editingIndex = null;
-        let currentMarketAvg = 0; // Stores base for calculator
+        let currentMarketAvg = 0;
 
         const models = {
             'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note'],
@@ -254,6 +260,7 @@
                 document.getElementById('listingsList').style.display = 'none';
                 document.getElementById('alertsCard').style.display = 'block';
                 loadAlertConfig();
+                triggerInstantScan();
             } else {
                 currentSection = section;
                 document.getElementById('modeTitle').innerText = section === 'cars' ? 'Standard Valuation' : 'Damaged / Salvage';
@@ -263,7 +270,6 @@
                 document.getElementById('listingsList').style.display = 'block';
                 document.getElementById('alertsCard').style.display = 'none';
                 
-                // Show calculator only on standard tab
                 document.getElementById('marginCalcCard').style.display = section === 'cars' ? 'block' : 'none';
                 document.getElementById('kpiRepaired').style.display = section === 'damagedcars' ? 'flex' : 'none';
 
@@ -282,6 +288,40 @@
                     document.getElementById('lblLow').innerText = 'TRADE / BUY TARGET';
                     document.getElementById('subLow').innerText = 'Short NCT / Prep Project';
                 }
+            }
+        }
+
+        async function triggerInstantScan() {
+            const feed = document.getElementById('matchedListingsFeed');
+            feed.innerHTML = '<div style="font-size:12px; color:#0284C7; font-style:italic;">Scanning DoneDeal for active profile matches...</div>';
+            
+            try {
+                const res = await fetch(`${API_URL}/api/scan-alerts`);
+                const data = await res.json();
+                
+                if (!data.matches || data.matches.length === 0) {
+                    feed.innerHTML = '<div style="font-size:12px; color:#64748B; font-style:italic;">No active listings currently match your criteria.</div>';
+                    return;
+                }
+
+                feed.innerHTML = '';
+                data.matches.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'listing-card';
+                    div.innerHTML = `
+                        <div class="listing-info">
+                            <div class="listing-title">${item.title}</div>
+                            <div class="listing-meta"><span class="year-badge">${item.year}</span><span>📍 ${item.location}</span><span style="color:#0284C7; font-weight:bold;">[${item.searchProfile}]</span></div>
+                        </div>
+                        <div class="listing-price-col">
+                            <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
+                            <a href="${item.url}" target="_blank" class="btn-view">View Ad ↗</a>
+                        </div>
+                    `;
+                    feed.appendChild(div);
+                });
+            } catch(e) {
+                feed.innerHTML = '<div style="font-size:12px; color:#DC2626; font-style:italic;">Failed to run instant scan.</div>';
             }
         }
 
@@ -394,6 +434,7 @@
                 setTimeout(() => feedback.innerText = '', 3000);
                 resetAlertForm();
                 renderActiveAlerts();
+                triggerInstantScan();
             } catch(e) {
                 feedback.innerText = "Error saving alert.";
             }
@@ -410,6 +451,7 @@
                     body: JSON.stringify(savedAlerts)
                 });
                 renderActiveAlerts();
+                triggerInstantScan();
             } catch(e) {
                 alert("Error removing alert.");
             }
