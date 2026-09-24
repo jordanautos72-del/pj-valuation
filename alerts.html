@@ -28,13 +28,11 @@
         button { flex: 1; height: 48px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
         .btn-primary { background: #0284C7; color: white; }
         .btn-sec { background: #E2E8F0; color: #334155; flex: 0.4; }
-        
         .btn-success { background: #16A34A; color: white; width: 100%; margin-bottom: 8px; }
         
         .active-alert-item { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
         .active-alert-info { font-size: 12px; font-weight: 700; color: #0F172A; }
         .active-alert-sub { font-size: 10px; color: #64748B; margin-top: 2px; }
-        
         .alert-actions { display: flex; gap: 6px; }
         .btn-edit-alert { background: #E0F2FE; color: #0284C7; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; height: auto; flex: none; }
         .btn-delete-alert { background: #FEE2E2; color: #DC2626; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; height: auto; flex: none; }
@@ -48,6 +46,17 @@
         .kpi-green { background: #F0FDF4; border: 1px solid #BBF7D0; color: #166534; }
         .kpi-blue { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF; }
         .kpi-yellow { background: #FEFCE8; border: 1px solid #FEF08A; color: #854D0E; }
+
+        /* Margin Calculator Box */
+        .calculator-card { background: #FFF; border: 1px solid #CBD5E1; border-radius: 10px; padding: 14px; margin-bottom: 14px; display: none; }
+        .calc-title { font-size: 12px; font-weight: 700; color: #334155; text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .calc-row { display: flex; gap: 8px; margin-bottom: 8px; }
+        .calc-row .field-group { flex: 1; margin-bottom: 0; }
+        .calc-row .field-group label { font-size: 10px; }
+        .calc-row input { height: 38px; font-size: 13px; }
+        .calc-result { background: #0F172A; color: #FFF; border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+        .calc-result-lbl { font-size: 11px; font-weight: 700; color: #38BDF8; }
+        .calc-result-val { font-size: 18px; font-weight: 800; color: #FFF; }
 
         .status-bar { font-size: 12px; color: #475569; margin-bottom: 12px; padding: 10px 12px; background: #FFF; border-radius: 8px; border: 1px solid #E2E8F0; }
         .listing-card { background: #FFF; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #E2E8F0; }
@@ -150,6 +159,28 @@
         </div>
     </div>
 
+    <!-- MARGIN & REPAIR CALCULATOR BOX -->
+    <div class="calculator-card" id="marginCalcCard">
+        <div class="calc-title">
+            <span>⚙️ Trade Buy-In & Margin Calculator</span>
+            <span style="font-size: 10px; color: #64748B;">Based on Market Avg</span>
+        </div>
+        <div class="calc-row">
+            <div class="field-group">
+                <label>Est. Parts / Repairs (€)</label>
+                <input type="number" id="calcRepairCost" value="800" oninput="calculateTradeMargin()">
+            </div>
+            <div class="field-group">
+                <label>Target Profit (€)</label>
+                <input type="number" id="calcTargetProfit" value="1500" oninput="calculateTradeMargin()">
+            </div>
+        </div>
+        <div class="calc-result">
+            <span class="calc-result-lbl">MAX SAFE BUY-IN CEILING</span>
+            <span class="calc-result-val" id="calcMaxBuyIn">€0</span>
+        </div>
+    </div>
+
     <div class="status-bar" id="statusBar">Ready. Select vehicle and tap Check Market.</div>
     <div id="listingsList"></div>
 
@@ -157,7 +188,8 @@
         let currentSection = 'cars';
         const API_URL = 'https://pj-val-proxy.pauljordanie.workers.dev';
         let savedAlerts = [];
-        let editingIndex = null; // Tracks which alert is currently being edited
+        let editingIndex = null;
+        let currentMarketAvg = 0; // Stores base for calculator
 
         const models = {
             'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note'],
@@ -217,6 +249,7 @@
                 document.getElementById('modeTitle').innerText = 'Multi-Alert Scanners';
                 document.getElementById('searchCard').style.display = 'none';
                 document.getElementById('kpiDashboard').style.display = 'none';
+                document.getElementById('marginCalcCard').style.display = 'none';
                 document.getElementById('statusBar').style.display = 'none';
                 document.getElementById('listingsList').style.display = 'none';
                 document.getElementById('alertsCard').style.display = 'block';
@@ -230,7 +263,10 @@
                 document.getElementById('listingsList').style.display = 'block';
                 document.getElementById('alertsCard').style.display = 'none';
                 
+                // Show calculator only on standard tab
+                document.getElementById('marginCalcCard').style.display = section === 'cars' ? 'block' : 'none';
                 document.getElementById('kpiRepaired').style.display = section === 'damagedcars' ? 'flex' : 'none';
+
                 if (section === 'damagedcars') {
                     document.getElementById('lblHigh').innerText = 'HIGHEST SALVAGE ASKING';
                     document.getElementById('subHigh').innerText = 'Minor Damage / High Spec';
@@ -247,6 +283,14 @@
                     document.getElementById('subLow').innerText = 'Short NCT / Prep Project';
                 }
             }
+        }
+
+        function calculateTradeMargin() {
+            if (currentMarketAvg <= 0) return;
+            const repairs = parseFloat(document.getElementById('calcRepairCost').value) || 0;
+            const profit = parseFloat(document.getElementById('calcTargetProfit').value) || 0;
+            const maxBuyIn = currentMarketAvg - repairs - profit;
+            document.getElementById('calcMaxBuyIn').innerText = maxBuyIn > 0 ? '€' + Math.round(maxBuyIn).toLocaleString() : '€0 (Too tight)';
         }
 
         async function loadAlertConfig() {
@@ -299,7 +343,6 @@
             document.getElementById('formTitle').innerText = 'Edit Active Alert';
             document.getElementById('saveAlertBtn').innerText = '💾 Update Alert';
             
-            // Add a cancel button if not already present
             if (!document.getElementById('cancelEditBtn')) {
                 const btnRow = document.getElementById('formBtnRow');
                 const cancelBtn = document.createElement('button');
@@ -436,8 +479,14 @@
             if (prices.length === 0) { status.innerText = 'No realistic asking prices found.'; return; }
             prices.sort((a, b) => a - b);
             
+            const marketAvgVal = getPercentile(prices, 50);
+            if (currentSection === 'cars') {
+                currentMarketAvg = marketAvgVal;
+                calculateTradeMargin();
+            }
+
             document.getElementById('statHigh').innerText = '€' + Math.round(getPercentile(prices, 85)).toLocaleString();
-            document.getElementById('statAvg').innerText = '€' + Math.round(getPercentile(prices, 50)).toLocaleString();
+            document.getElementById('statAvg').innerText = '€' + Math.round(marketAvgVal).toLocaleString();
             document.getElementById('statLow').innerText = '€' + Math.round(getPercentile(prices, 15)).toLocaleString();
             if (currentSection === 'damagedcars') document.getElementById('statRepaired').innerText = stdAvg > 0 ? '€' + Math.round(stdAvg).toLocaleString() : 'N/A';
 
