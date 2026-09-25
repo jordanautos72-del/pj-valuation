@@ -86,7 +86,8 @@
     <div class="nav-tabs">
         <button class="nav-tab active" id="tabStandard" onclick="switchMode('cars')">Standard</button>
         <button class="nav-tab" id="tabSalvage" onclick="switchMode('damagedcars')">Salvage</button>
-        <button class="nav-tab" id="tabAlerts" onclick="switchMode('alerts')">Auto Alerts</button>
+        <button class="nav-tab" id="tabHitList" onclick="switchMode('hitlist')">🎯 Hit List</button>
+        <button class="nav-tab" id="tabAlerts" onclick="switchMode('alerts')">Alerts</button>
     </div>
 
     <!-- MAIN SEARCH CARD -->
@@ -106,6 +107,21 @@
         <div class="btn-row">
             <button class="btn-primary" onclick="lookupVehicle(false)">🔍 Check Market</button>
             <button class="btn-sec" onclick="lookupVehicle(true)">⚡ Live</button>
+        </div>
+    </div>
+
+    <!-- HIT LIST CARD -->
+    <div class="card" id="hitListCard" style="display: none;">
+        <h3 style="margin-top:0; font-size:14px; color:#DC2626;">🎯 Stagnant Inventory (45+ Days)</h3>
+        <div style="font-size: 11px; color: #64748B; margin-bottom: 12px;">High-leverage vehicles sitting past their prime. Ready for lowball cash offers.</div>
+        
+        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+            <button class="btn-primary" onclick="loadHitList('damagedcars')" id="btnHitSalvage">💥 Salvage Hit List</button>
+            <button class="btn-sec" onclick="loadHitList('cars')" id="btnHitStandard">🚗 Standard Hit List</button>
+        </div>
+
+        <div id="hitListFeed">
+            <div style="font-size: 12px; color: #64748B; font-style: italic;">Select a category above to scan your targets...</div>
         </div>
     </div>
 
@@ -136,8 +152,9 @@
             <div class="field-group"><label>Year To</label><select id="alertYearTo"></select></div>
         </div>
         <div class="row-group">
-            <div class="field-group"><label>Min Buy-in Price (€)</label><input type="number" id="alertMinPrice" placeholder="e.g. 500" value="500"></div>
-            <div class="field-group"><label>Max Buy-in Price (€)</label><input type="number" id="alertPrice" placeholder="e.g. 3000" value="3000"></div>
+            <div class="field-group"><label>Min Buy-in (€)</label><input type="number" id="alertMinPrice" placeholder="500" value="500"></div>
+            <div class="field-group"><label>Max Buy-in (€)</label><input type="number" id="alertPrice" placeholder="3000" value="3000"></div>
+            <div class="field-group"><label>Min DOM (Days)</label><input type="number" id="alertMinDom" placeholder="0" value="0"></div>
         </div>
         
         <div style="margin-top: 10px; display: flex; gap: 8px;" id="formBtnRow">
@@ -258,28 +275,26 @@
         function switchMode(section) {
             document.getElementById('tabStandard').className = section === 'cars' ? 'nav-tab active' : 'nav-tab';
             document.getElementById('tabSalvage').className = section === 'damagedcars' ? 'nav-tab active' : 'nav-tab';
+            document.getElementById('tabHitList').className = section === 'hitlist' ? 'nav-tab active' : 'nav-tab';
             document.getElementById('tabAlerts').className = section === 'alerts' ? 'nav-tab active' : 'nav-tab';
+
+            document.getElementById('searchCard').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
+            document.getElementById('kpiDashboard').style.display = (section === 'cars' || section === 'damagedcars') ? 'flex' : 'none';
+            document.getElementById('marginCalcCard').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
+            document.getElementById('statusBar').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
+            document.getElementById('listingsList').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
+            document.getElementById('alertsCard').style.display = section === 'alerts' ? 'block' : 'none';
+            document.getElementById('hitListCard').style.display = section === 'hitlist' ? 'block' : 'none';
 
             if (section === 'alerts') {
                 document.getElementById('modeTitle').innerText = 'Multi-Alert Scanners';
-                document.getElementById('searchCard').style.display = 'none';
-                document.getElementById('kpiDashboard').style.display = 'none';
-                document.getElementById('marginCalcCard').style.display = 'none';
-                document.getElementById('statusBar').style.display = 'none';
-                document.getElementById('listingsList').style.display = 'none';
-                document.getElementById('alertsCard').style.display = 'block';
-                loadAlertConfig();
-                triggerInstantScan();
+                loadAlertConfig().then(() => triggerInstantScan());
+            } else if (section === 'hitlist') {
+                document.getElementById('modeTitle').innerText = '🎯 Stagnant Hit List';
+                loadAlertConfig().then(() => loadHitList('damagedcars')); // Defaults to loading Salvage hit list
             } else {
                 currentSection = section;
                 document.getElementById('modeTitle').innerText = section === 'cars' ? 'Standard Valuation' : 'Damaged / Salvage';
-                document.getElementById('searchCard').style.display = 'block';
-                document.getElementById('kpiDashboard').style.display = 'flex';
-                document.getElementById('statusBar').style.display = 'block';
-                document.getElementById('listingsList').style.display = 'block';
-                document.getElementById('alertsCard').style.display = 'none';
-                
-                document.getElementById('marginCalcCard').style.display = 'block';
                 document.getElementById('kpiRepaired').style.display = section === 'damagedcars' ? 'flex' : 'none';
 
                 if (section === 'damagedcars') {
@@ -311,6 +326,109 @@
             }
         }
 
+        // ==========================================
+        // 🎯 STAGNANT HIT LIST LOGIC
+        // ==========================================
+        async function loadHitList(category) {
+            document.getElementById('btnHitSalvage').className = category === 'damagedcars' ? 'btn-primary' : 'btn-sec';
+            document.getElementById('btnHitStandard').className = category === 'cars' ? 'btn-primary' : 'btn-sec';
+
+            const feed = document.getElementById('hitListFeed');
+            feed.innerHTML = '<div style="font-size:12px; color:#0284C7; font-style:italic;">Hunting for stagnant inventory (45+ Days)...</div>';
+
+            const targets = savedAlerts.filter(a => a.section === category);
+            if (targets.length === 0) {
+                feed.innerHTML = `<div style="font-size:12px; color:#64748B; font-style:italic;">No active scanners found for ${category === 'cars' ? 'Standard' : 'Salvage'}. Add scanners in the Alerts tab to pull their hit lists.</div>`;
+                return;
+            }
+
+            let stagnantListings = [];
+
+            for (let config of targets) {
+                try {
+                    const url = `${API_URL}/?section=${category}&make=${encodeURIComponent(config.make)}&model=${encodeURIComponent(config.model)}&year_from=${config.yearFrom}&year_to=${config.yearTo}`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    
+                    if (data && data.ads) {
+                        data.ads.forEach(ad => {
+                            let priceNum = parseFloat((ad.price||"").replace(/[^0-9.]/g, '')) || 0;
+                            if (priceNum >= config.minPrice && priceNum <= config.price) {
+                                if (ad.publishDate) {
+                                    let d = new Date(ad.publishDate);
+                                    let now = new Date();
+                                    let domDays = Math.floor(Math.abs(now - d) / (1000 * 60 * 60 * 24));
+                                    
+                                    // 45 DAY HIT LIST THRESHOLD
+                                    if (domDays >= 45) { 
+                                        let adUrl = ad.friendlyUrl ? (ad.friendlyUrl.startsWith('http') ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`) : `https://www.donedeal.ie/${category}-for-sale/view/${ad.id}`;
+                                        
+                                        let adYear = ad.year || "N/A";
+                                        if (adYear === "N/A") {
+                                            const yearMatch = (ad.header || "").match(/\b(20[0-2][0-9])\b/);
+                                            if (yearMatch) adYear = yearMatch[1];
+                                        }
+
+                                        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                                        let pubDateStr = `${d.getDate().toString().padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
+
+                                        if (!stagnantListings.find(l => l.url === adUrl)) {
+                                            stagnantListings.push({
+                                                title: ad.header,
+                                                year: adYear,
+                                                price: priceNum,
+                                                location: ad.county || 'Ireland',
+                                                url: adUrl,
+                                                date: pubDateStr,
+                                                dom: domDays,
+                                                model: config.model
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                } catch(e) { console.log(e); }
+            }
+
+            if (stagnantListings.length === 0) {
+                feed.innerHTML = '<div style="font-size:12px; color:#16A34A; font-style:italic;">No stagnant inventory found. The market is moving fast!</div>';
+                return;
+            }
+
+            stagnantListings.sort((a, b) => b.dom - a.dom); // Sort by stalest first
+
+            feed.innerHTML = '';
+            stagnantListings.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'listing-card';
+                div.innerHTML = `
+                    <div class="listing-info">
+                        <div class="listing-title">${item.title}</div>
+                        <div class="listing-meta">
+                            <span class="year-badge">${item.year}</span>
+                            <span>📍 ${item.location}</span>
+                        </div>
+                    </div>
+                    <div class="listing-date-col" style="background-color: #FEF2F2; padding: 4px 8px; border-radius: 6px; border: 1px solid #FECACA;">
+                        <div class="listing-date-lbl" style="color: #DC2626;">Stagnant</div>
+                        <div class="listing-date-val" style="color: #DC2626; font-size:13px;">⏳ ${item.dom} Days</div>
+                        <div style="font-size: 8px; color: #7F1D1D; margin-top:2px;">Since ${item.date}</div>
+                    </div>
+                    <div class="listing-price-col">
+                        <div class="listing-price" style="color: #0F172A;">€${Math.round(item.price).toLocaleString()}</div>
+                        <a href="${item.url}" target="_blank" class="btn-view" style="background:#DC2626;">Lowball ↗</a>
+                    </div>
+                `;
+                feed.appendChild(div);
+            });
+        }
+
+
+        // ==========================================
+        // STANDARD ALERTS & MARKET LOGIC
+        // ==========================================
         async function clearAlertCache() {
             const feedback = document.getElementById('cacheFeedback');
             feedback.innerText = "Clearing sent-ad history...";
@@ -413,12 +531,13 @@
             savedAlerts.forEach((alert, index) => {
                 const typeText = alert.section === 'cars' ? 'Standard' : 'Salvage';
                 const minP = alert.minPrice ? `Min: €${alert.minPrice} | ` : '';
+                const domTxt = alert.minDom > 0 ? `DOM: ${alert.minDom}+ | ` : '';
                 const div = document.createElement('div');
                 div.className = 'active-alert-item';
                 div.innerHTML = `
                     <div>
                         <div class="active-alert-info">${alert.make} ${alert.model} (${typeText})</div>
-                        <div class="active-alert-sub">Years: ${alert.yearFrom}-${alert.yearTo} | ${minP}Max: €${alert.price}</div>
+                        <div class="active-alert-sub">Years: ${alert.yearFrom}-${alert.yearTo} | ${domTxt}${minP}Max: €${alert.price}</div>
                     </div>
                     <div class="alert-actions">
                         <button class="btn-edit-alert" onclick="editAlert(${index})">Edit</button>
@@ -441,6 +560,7 @@
             document.getElementById('alertYearTo').value = alert.yearTo;
             document.getElementById('alertMinPrice').value = alert.minPrice || 500;
             document.getElementById('alertPrice').value = alert.price;
+            document.getElementById('alertMinDom').value = alert.minDom || 0;
 
             document.getElementById('formTitle').innerText = 'Edit Active Alert';
             document.getElementById('saveAlertBtn').innerText = '💾 Update Alert';
@@ -479,7 +599,8 @@
                 yearFrom: document.getElementById('alertYearFrom').value,
                 yearTo: document.getElementById('alertYearTo').value,
                 minPrice: document.getElementById('alertMinPrice').value,
-                price: document.getElementById('alertPrice').value
+                price: document.getElementById('alertPrice').value,
+                minDom: document.getElementById('alertMinDom').value
             };
 
             if (editingIndex !== null) {
