@@ -346,7 +346,8 @@
 
             for (let config of targets) {
                 try {
-                    const url = `${API_URL}/?section=${category}&make=${encodeURIComponent(config.make)}&model=${encodeURIComponent(config.model)}&year_from=${config.yearFrom}&year_to=${config.yearTo}`;
+                    // NEW: Appending &sort=publishdate+asc grabs the absolute oldest ads first!
+                    const url = `${API_URL}/?section=${category}&make=${encodeURIComponent(config.make)}&model=${encodeURIComponent(config.model)}&year_from=${config.yearFrom}&year_to=${config.yearTo}&sort=publishdate+asc`;
                     const res = await fetch(url);
                     const data = await res.json();
                     
