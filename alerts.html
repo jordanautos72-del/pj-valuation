@@ -12,8 +12,8 @@
         .header h1 { margin: 0; font-size: 16px; font-weight: 700; }
         .header span { font-size: 11px; color: #38BDF8; font-weight: bold; }
         
-        .nav-tabs { display: flex; background: #1E293B; border-radius: 8px; padding: 4px; margin-bottom: 14px; }
-        .nav-tab { flex: 1; padding: 10px 4px; text-align: center; color: #94A3B8; font-size: 11px; font-weight: 700; cursor: pointer; border: none; background: transparent; border-radius: 6px; }
+        .nav-tabs { display: flex; background: #1E293B; border-radius: 8px; padding: 4px; margin-bottom: 14px; overflow-x: auto; white-space: nowrap; }
+        .nav-tab { flex: 1; padding: 10px 8px; text-align: center; color: #94A3B8; font-size: 11px; font-weight: 700; cursor: pointer; border: none; background: transparent; border-radius: 6px; }
         .nav-tab.active { background: #FFF; color: #0F172A; }
 
         .card { background: #FFF; border-radius: 12px; padding: 16px; margin-bottom: 14px; box-shadow: 0 2px 6px rgba(15,23,42,0.08); }
@@ -83,11 +83,12 @@
         <span id="modeTitle">Standard Valuation</span>
     </div>
 
-  <div class="nav-tabs">
+    <div class="nav-tabs">
         <button class="nav-tab active" id="tabStandard" onclick="switchMode('cars')">Standard</button>
         <button class="nav-tab" id="tabSalvage" onclick="switchMode('damagedcars')">Salvage</button>
         <button class="nav-tab" id="tabAlerts" onclick="switchMode('alerts')">Alerts</button>
         <button class="nav-tab" id="tabHitList" onclick="switchMode('hitlist')">🎯 Hit List</button>
+        <button class="nav-tab" id="tabShortlist" onclick="switchMode('shortlist')">⭐ Shortlist</button>
     </div>
 
     <!-- MAIN SEARCH CARD -->
@@ -110,14 +111,30 @@
         </div>
     </div>
 
+    <!-- SHORTLIST CARD -->
+    <div class="card" id="shortlistCard" style="display: none;">
+        <h3 style="margin-top:0; font-size:14px; color:#0284C7;">⭐ Save to Shortlist</h3>
+        <div style="font-size: 11px; color: #64748B; margin-bottom: 12px;">Found a good ad on the DoneDeal app? Paste the link here to save it to your synced shortlist.</div>
+        
+        <div class="field-group">
+            <label>DoneDeal Ad URL / Title</label>
+            <input type="text" id="shortlistUrl" placeholder="https://www.donedeal.ie/cars-for-sale/...">
+        </div>
+        <button class="btn-success" onclick="addToShortlist()">Add to Shortlist</button>
+
+        <hr style="border:0; border-top:1px solid #E2E8F0; margin: 16px 0;">
+        <h3 style="margin-top:0; font-size:14px; color:#0F172A;">📌 Your Saved Vehicles</h3>
+        <div id="shortlistFeed"></div>
+    </div>
+
     <!-- HIT LIST CARD -->
     <div class="card" id="hitListCard" style="display: none;">
         <h3 style="margin-top:0; font-size:14px; color:#DC2626;">🎯 Stagnant Inventory (45+ Days)</h3>
         <div style="font-size: 11px; color: #64748B; margin-bottom: 12px;">High-leverage vehicles sitting past their prime. Ready for lowball cash offers.</div>
         
         <div style="display: flex; gap: 8px; margin-bottom: 14px;">
-            <button class="btn-primary" onclick="loadHitList('damagedcars')" id="btnHitSalvage">💥 Salvage Hit List</button>
-            <button class="btn-sec" onclick="loadHitList('cars')" id="btnHitStandard">🚗 Standard Hit List</button>
+            <button class="btn-primary" onclick="loadHitList('damagedcars')" id="btnHitSalvage">💥 Salvage</button>
+            <button class="btn-sec" onclick="loadHitList('cars')" id="btnHitStandard">🚗 Standard</button>
         </div>
 
         <div id="hitListFeed">
@@ -154,7 +171,7 @@
         <div class="row-group">
             <div class="field-group"><label>Min Buy-in (€)</label><input type="number" id="alertMinPrice" placeholder="500" value="500"></div>
             <div class="field-group"><label>Max Buy-in (€)</label><input type="number" id="alertPrice" placeholder="3000" value="3000"></div>
-            <div class="field-group"><label>Min DOM (Days)</label><input type="number" id="alertMinDom" placeholder="0" value="0"></div>
+            <div class="field-group"><label>Min DOM</label><input type="number" id="alertMinDom" placeholder="0" value="0"></div>
         </div>
         
         <div style="margin-top: 10px; display: flex; gap: 8px;" id="formBtnRow">
@@ -222,6 +239,9 @@
         let editingIndex = null;
         let currentMarketAvg = 0;
         let currentRepairedAvg = 0;
+        
+        // Shortlist is now cloud-synced
+        let shortlist = [];
 
         const models = {
             'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note'],
@@ -256,19 +276,20 @@
             updateModels();
             updateAlertModels();
             loadAlertConfig();
+            loadShortlistFromCloud();
         }
 
         function updateModels() {
             const make = document.getElementById('makeSelect').value;
             const modelSel = document.getElementById('modelSelect');
-            modelSel.innerHTML = '';
+            modelSel.innerHTML = '<option value="Any">Any Model</option>';
             models[make].forEach(m => modelSel.appendChild(new Option(m, m)));
         }
 
         function updateAlertModels() {
             const make = document.getElementById('alertMake').value;
             const modelSel = document.getElementById('alertModel');
-            modelSel.innerHTML = '';
+            modelSel.innerHTML = '<option value="Any">Any Model</option>';
             models[make].forEach(m => modelSel.appendChild(new Option(m, m)));
         }
 
@@ -277,6 +298,7 @@
             document.getElementById('tabSalvage').className = section === 'damagedcars' ? 'nav-tab active' : 'nav-tab';
             document.getElementById('tabHitList').className = section === 'hitlist' ? 'nav-tab active' : 'nav-tab';
             document.getElementById('tabAlerts').className = section === 'alerts' ? 'nav-tab active' : 'nav-tab';
+            document.getElementById('tabShortlist').className = section === 'shortlist' ? 'nav-tab active' : 'nav-tab';
 
             document.getElementById('searchCard').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
             document.getElementById('kpiDashboard').style.display = (section === 'cars' || section === 'damagedcars') ? 'flex' : 'none';
@@ -285,13 +307,17 @@
             document.getElementById('listingsList').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
             document.getElementById('alertsCard').style.display = section === 'alerts' ? 'block' : 'none';
             document.getElementById('hitListCard').style.display = section === 'hitlist' ? 'block' : 'none';
+            document.getElementById('shortlistCard').style.display = section === 'shortlist' ? 'block' : 'none';
 
             if (section === 'alerts') {
                 document.getElementById('modeTitle').innerText = 'Multi-Alert Scanners';
                 loadAlertConfig().then(() => triggerInstantScan());
             } else if (section === 'hitlist') {
                 document.getElementById('modeTitle').innerText = '🎯 Stagnant Hit List';
-                loadAlertConfig().then(() => loadHitList('damagedcars')); // Defaults to loading Salvage hit list
+                loadAlertConfig().then(() => loadHitList('damagedcars'));
+            } else if (section === 'shortlist') {
+                document.getElementById('modeTitle').innerText = '⭐ Saved Shortlist';
+                loadShortlistFromCloud();
             } else {
                 currentSection = section;
                 document.getElementById('modeTitle').innerText = section === 'cars' ? 'Standard Valuation' : 'Damaged / Salvage';
@@ -327,6 +353,76 @@
         }
 
         // ==========================================
+        // ⭐ SHORTLIST LOGIC (CLOUD SYNCED)
+        // ==========================================
+        async function loadShortlistFromCloud() {
+            try {
+                const res = await fetch(`${API_URL}/api/shortlist`);
+                shortlist = await res.json();
+                renderShortlist();
+            } catch(e) {
+                shortlist = [];
+            }
+        }
+
+        async function saveShortlistToCloud() {
+            try {
+                await fetch(`${API_URL}/api/shortlist`, {
+                    method: 'POST',
+                    body: JSON.stringify(shortlist),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            } catch(e) {}
+        }
+
+        function addToShortlist() {
+            const input = document.getElementById('shortlistUrl');
+            const val = input.value.trim();
+            if (!val) return;
+
+            const isUrl = val.startsWith('http');
+            const title = isUrl ? 'Saved Ad Link' : val;
+            const url = isUrl ? val : '#';
+
+            shortlist.unshift({
+                title: title,
+                url: url,
+                dateAdded: new Date().toLocaleDateString('en-GB')
+            });
+
+            saveShortlistToCloud();
+            input.value = '';
+            renderShortlist();
+        }
+
+        function removeShortlist(index) {
+            shortlist.splice(index, 1);
+            saveShortlistToCloud();
+            renderShortlist();
+        }
+
+        function renderShortlist() {
+            const list = document.getElementById('shortlistFeed');
+            list.innerHTML = '';
+            if (shortlist.length === 0) {
+                list.innerHTML = `<div style="font-size: 13px; color: #64748B;">Your shortlist is empty.</div>`;
+                return;
+            }
+
+            shortlist.forEach((item, index) => {
+                const linkHtml = item.url !== '#' ? `<a href="${item.url}" target="_blank" style="color: #0284C7; font-weight: bold; text-decoration: none; font-size: 13px; display:block; margin-top:4px;">↗ Open Link</a>` : '';
+                list.innerHTML += `
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; margin-bottom: 8px;">
+                        <div style="font-size: 13px; font-weight: 700; color: #0F172A; word-break: break-all;">${item.title}</div>
+                        <div style="font-size: 11px; color: #64748B; margin-top: 2px;">Added: ${item.dateAdded}</div>
+                        ${linkHtml}
+                        <button onclick="removeShortlist(${index})" style="background: #FFF; border: 1px solid #EF4444; color: #EF4444; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-top: 8px; width: 100%;">🗑️ Remove</button>
+                    </div>
+                `;
+            });
+        }
+
+        // ==========================================
         // 🎯 STAGNANT HIT LIST LOGIC
         // ==========================================
         async function loadHitList(category) {
@@ -346,8 +442,8 @@
 
             for (let config of targets) {
                 try {
-                    // NEW: Appending &sort=publishdate+asc grabs the absolute oldest ads first!
-                    const url = `${API_URL}/?section=${category}&make=${encodeURIComponent(config.make)}&model=${encodeURIComponent(config.model)}&year_from=${config.yearFrom}&year_to=${config.yearTo}&sort=publishdate+asc`;
+                    let searchWord = (config.model === "Any" || config.model === "") ? config.make : config.model;
+                    const url = `${API_URL}/?section=${category}&make=${encodeURIComponent(config.make)}&model=${encodeURIComponent(searchWord)}&year_from=${config.yearFrom}&year_to=${config.yearTo}&sort=publishdate+asc`;
                     const res = await fetch(url);
                     const data = await res.json();
                     
@@ -360,7 +456,6 @@
                                     let now = new Date();
                                     let domDays = Math.floor(Math.abs(now - d) / (1000 * 60 * 60 * 24));
                                     
-                                    // 45 DAY HIT LIST THRESHOLD
                                     if (domDays >= 45) { 
                                         let adUrl = ad.friendlyUrl ? (ad.friendlyUrl.startsWith('http') ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`) : `https://www.donedeal.ie/${category}-for-sale/view/${ad.id}`;
                                         
@@ -398,7 +493,7 @@
                 return;
             }
 
-            stagnantListings.sort((a, b) => b.dom - a.dom); // Sort by stalest first
+            stagnantListings.sort((a, b) => b.dom - a.dom);
 
             feed.innerHTML = '';
             stagnantListings.forEach(item => {
@@ -655,12 +750,14 @@
             const status = document.getElementById('statusBar');
             status.innerText = `Querying live DoneDeal market...`;
 
-            const primaryUrl = `${API_URL}/?section=${currentSection}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
+            let searchWord = (model === "Any" || model === "") ? make : model;
+
+            const primaryUrl = `${API_URL}/?section=${currentSection}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(searchWord)}&year_from=${yearFrom}&year_to=${yearTo}`;
             const fetchPromises = [ fetch(primaryUrl).then(r => r.ok ? r.json() : null).catch(()=>null) ];
             
             let stdIndex = -1, stdAvg = 0;
             if (currentSection === 'damagedcars') {
-                const stdUrl = `${API_URL}/?section=cars&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
+                const stdUrl = `${API_URL}/?section=cars&make=${encodeURIComponent(make)}&model=${encodeURIComponent(searchWord)}&year_from=${yearFrom}&year_to=${yearTo}`;
                 stdIndex = fetchPromises.length;
                 fetchPromises.push(fetch(stdUrl).then(r => r.ok ? r.json() : null).catch(()=>null));
             }
@@ -776,300 +873,6 @@
         }
 
         initDropdowns();
-    </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PJ Motor Trade - Mobile</title>
-    <style>
-        :root {
-            --bg: #F1F5F9;
-            --surface: #FFFFFF;
-            --primary: #0284C7;
-            --text-main: #0F172A;
-            --text-muted: #64748B;
-            --danger: #EF4444;
-            --success: #10B981;
-            --border: #E2E8F0;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
-        body { background-color: var(--bg); color: var(--text-main); padding-bottom: 70px; }
-        
-        header { background-color: #0F172A; color: white; padding: 16px; text-align: center; font-weight: bold; font-size: 18px; position: sticky; top: 0; z-index: 10; }
-        
-        .container { padding: 16px; display: none; }
-        .container.active { display: block; }
-        
-        .card { background: var(--surface); border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .card-title { font-size: 15px; font-weight: bold; margin-bottom: 12px; color: var(--primary); }
-        
-        label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: var(--text-muted); }
-        select, input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; font-size: 14px; background: white; }
-        
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        
-        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; color: white; }
-        .btn-primary { background-color: var(--primary); }
-        .btn-danger { background-color: var(--danger); padding: 8px; font-size: 12px; margin-top: 8px; }
-        .btn-success { background-color: var(--success); }
-        
-        .list-item { border-bottom: 1px solid var(--border); padding: 12px 0; }
-        .list-item:last-child { border-bottom: none; }
-        .item-title { font-weight: bold; font-size: 14px; margin-bottom: 4px; }
-        .item-sub { font-size: 12px; color: var(--text-muted); }
-        
-        /* Bottom Navigation */
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; border-top: 1px solid var(--border); }
-        .nav-btn { flex: 1; padding: 16px; text-align: center; color: var(--text-muted); font-size: 14px; font-weight: bold; cursor: pointer; border-radius: 0; background: transparent; }
-        .nav-btn.active { color: var(--primary); border-top: 3px solid var(--primary); background: #F8FAFC; }
-    </style>
-</head>
-<body>
-
-    <header>🚗 PJ Auto Alerts</header>
-
-    <!-- TAB 1: CLOUD SCANNERS -->
-    <div id="tab-scanners" class="container active">
-        <div class="card">
-            <div class="card-title">📡 Active Cloud Scanners</div>
-            <div id="scanners-list">
-                <p style="font-size: 13px; color: var(--text-muted);">Loading scanners from cloud...</p>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-title">➕ Add New Scanner</div>
-            
-            <div class="grid-2">
-                <div>
-                    <label>Category</label>
-                    <select id="new-section">
-                        <option value="cars">Standard Cars</option>
-                        <option value="damagedcars">Salvage / Damaged</option>
-                    </select>
-                </div>
-                <div>
-                    <label>Make</label>
-                    <select id="new-make" onchange="updateModels()"></select>
-                </div>
-            </div>
-
-            <label>Model</label>
-            <select id="new-model"></select>
-
-            <div class="grid-2">
-                <div><label>Year From</label><input type="number" id="new-yfrom" value="2010"></div>
-                <div><label>Year To</label><input type="number" id="new-yto" value="2026"></div>
-                <div><label>Min Price (€)</label><input type="number" id="new-pmin" value="500"></div>
-                <div><label>Max Price (€)</label><input type="number" id="new-pmax" value="3000"></div>
-                <div><label>Min Days on Market</label><input type="number" id="new-dom" value="0"></div>
-            </div>
-
-            <button class="btn-primary" onclick="addScanner()" id="add-btn">Save to Cloud Scanners</button>
-        </div>
-    </div>
-
-    <!-- TAB 2: SHORTLIST -->
-    <div id="tab-shortlist" class="container">
-        <div class="card">
-            <div class="card-title">⭐ Save to Shortlist</div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Found a good ad on the DoneDeal app? Paste the link here to save it.</p>
-            <label>DoneDeal Ad URL / Title</label>
-            <input type="text" id="shortlist-url" placeholder="https://www.donedeal.ie/cars-for-sale/...">
-            <button class="btn-success" onclick="addToShortlist()">Add to Shortlist</button>
-        </div>
-
-        <div class="card">
-            <div class="card-title">📌 Your Saved Vehicles</div>
-            <div id="shortlist-items">
-                <p style="font-size: 13px; color: var(--text-muted);">Your shortlist is empty.</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- BOTTOM NAVIGATION -->
-    <div class="bottom-nav">
-        <div class="nav-btn active" onclick="switchTab('scanners', this)">📡 Scanners</div>
-        <div class="nav-btn" onclick="switchTab('shortlist', this)">⭐ Shortlist</div>
-    </div>
-
-    <script>
-        const CLOUDFLARE_API = 'https://pj-val-proxy.pauljordanie.workers.dev/api/config';
-        let cloudConfigs = [];
-        let shortlist = JSON.parse(localStorage.getItem('pj_shortlist')) || [];
-
-        const carData = {
-            'Volkswagen': ['Golf', 'Passat', 'Polo', 'Tiguan', 'Caddy', 'Transporter'],
-            'Ford': ['Focus', 'Fiesta', 'Mondeo', 'Kuga', 'Transit Connect', 'Transit'],
-            'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note'],
-            'Peugeot': ['208', '308', '2008', '3008', '5008', 'Partner'],
-            'Toyota': ['Corolla', 'Yaris', 'Avensis', 'Auris', 'Prius', 'Land Cruiser'],
-            'Hyundai': ['Tucson', 'i30', 'i40', 'Santa Fe', 'Kona'],
-            'Kia': ['Sportage', 'Ceed', 'Sorento', 'Rio'],
-            'Audi': ['A3', 'A4', 'A6', 'Q3', 'Q5'],
-            'BMW': ['3 Series', '5 Series', '1 Series', 'X3', 'X5'],
-            'Skoda': ['Octavia', 'Superb', 'Fabia', "Kodiaq"],
-            'Renault': ['Clio', 'Megane', 'Captur', 'Kadjar', 'Trafic']
-        };
-
-        function initApp() {
-            const makeSelect = document.getElementById('new-make');
-            for (const make in carData) {
-                makeSelect.innerHTML += `<option value="${make}">${make}</option>`;
-            }
-            makeSelect.value = 'Ford';
-            updateModels();
-            fetchConfigs();
-            renderShortlist();
-        }
-
-        function updateModels() {
-            const make = document.getElementById('new-make').value;
-            const modelSelect = document.getElementById('new-model');
-            modelSelect.innerHTML = `<option value="Any">Any Model</option>`;
-            if (carData[make]) {
-                carData[make].forEach(model => {
-                    modelSelect.innerHTML += `<option value="${model}">${model}</option>`;
-                });
-            }
-        }
-
-        function switchTab(tabId, element) {
-            document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
-            document.getElementById('tab-' + tabId).classList.add('active');
-            
-            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-            element.classList.add('active');
-        }
-
-        async function fetchConfigs() {
-            try {
-                const res = await fetch(CLOUDFLARE_API);
-                cloudConfigs = await res.json();
-                renderConfigs();
-            } catch (err) {
-                document.getElementById('scanners-list').innerHTML = `<p style="color:red; font-size:12px;">Failed to load cloud configurations.</p>`;
-            }
-        }
-
-        function renderConfigs() {
-            const list = document.getElementById('scanners-list');
-            list.innerHTML = '';
-            if (cloudConfigs.length === 0) {
-                list.innerHTML = `<p style="font-size: 13px; color: var(--text-muted);">No active scanners running.</p>`;
-                return;
-            }
-            
-            cloudConfigs.forEach((c, index) => {
-                const tag = c.section === 'cars' ? 'Standard' : 'Salvage';
-                list.innerHTML += `
-                    <div class="list-item">
-                        <div class="item-title">[${tag}] ${c.make} ${c.model}</div>
-                        <div class="item-sub">Yrs: ${c.yearFrom}-${c.yearTo} | €${c.minPrice} - €${c.price} | DOM: ${c.minDom}+</div>
-                        <button class="btn-danger" onclick="deleteScanner(${index})">🗑️ Remove</button>
-                    </div>
-                `;
-            });
-        }
-
-        async function addScanner() {
-            const btn = document.getElementById('add-btn');
-            btn.innerText = 'Saving...'; btn.disabled = true;
-
-            const newConf = {
-                active: true,
-                section: document.getElementById('new-section').value,
-                make: document.getElementById('new-make').value,
-                model: document.getElementById('new-model').value,
-                yearFrom: parseInt(document.getElementById('new-yfrom').value),
-                yearTo: parseInt(document.getElementById('new-yto').value),
-                minPrice: parseInt(document.getElementById('new-pmin').value),
-                price: parseInt(document.getElementById('new-pmax').value),
-                minDom: parseInt(document.getElementById('new-dom').value)
-            };
-
-            cloudConfigs.push(newConf);
-            
-            try {
-                await fetch(CLOUDFLARE_API, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(cloudConfigs)
-                });
-                renderConfigs();
-                alert('Scanner successfully synced to Cloudflare!');
-            } catch (err) {
-                alert('Failed to save to cloud.');
-            }
-            btn.innerText = 'Save to Cloud Scanners'; btn.disabled = false;
-        }
-
-        async function deleteScanner(index) {
-            if(!confirm('Remove this scanner from the cloud?')) return;
-            cloudConfigs.splice(index, 1);
-            try {
-                await fetch(CLOUDFLARE_API, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(cloudConfigs)
-                });
-                renderConfigs();
-            } catch (err) { alert('Failed to delete.'); }
-        }
-
-        // --- SHORTLIST LOGIC ---
-        function addToShortlist() {
-            const input = document.getElementById('shortlist-url');
-            const val = input.value.trim();
-            if (!val) return;
-
-            const isUrl = val.startsWith('http');
-            const title = isUrl ? 'Saved Ad Link' : val;
-            const url = isUrl ? val : '#';
-
-            shortlist.unshift({
-                title: title,
-                url: url,
-                dateAdded: new Date().toLocaleDateString('en-GB')
-            });
-
-            localStorage.setItem('pj_shortlist', JSON.stringify(shortlist));
-            input.value = '';
-            renderShortlist();
-        }
-
-        function removeShortlist(index) {
-            shortlist.splice(index, 1);
-            localStorage.setItem('pj_shortlist', JSON.stringify(shortlist));
-            renderShortlist();
-        }
-
-        function renderShortlist() {
-            const list = document.getElementById('shortlist-items');
-            list.innerHTML = '';
-            if (shortlist.length === 0) {
-                list.innerHTML = `<p style="font-size: 13px; color: var(--text-muted);">Your shortlist is empty.</p>`;
-                return;
-            }
-
-            shortlist.forEach((item, index) => {
-                const linkHtml = item.url !== '#' ? `<a href="${item.url}" target="_blank" style="color: var(--primary); text-decoration: none; font-size: 13px; display:block; margin-top:4px;">↗ Open Link</a>` : '';
-                list.innerHTML += `
-                    <div class="list-item">
-                        <div class="item-title" style="word-break: break-all;">${item.title}</div>
-                        <div class="item-sub">Added: ${item.dateAdded}</div>
-                        ${linkHtml}
-                        <button class="btn-danger" onclick="removeShortlist(${index})">🗑️ Remove</button>
-                    </div>
-                `;
-            });
-        }
-
-        // Initialize App on load
-        window.onload = initApp;
     </script>
 </body>
 </html>
