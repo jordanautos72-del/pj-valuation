@@ -3,779 +3,293 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PJ Market Valuation & Salvage Guide</title>
-    <meta name="theme-color" content="#0F172A">
+    <title>PJ Motor Trade - Mobile</title>
     <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; padding: 14px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #F1F5F9; color: #0F172A; }
-        .header { background: #0F172A; color: #FFF; padding: 16px; border-radius: 12px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
-        .header h1 { margin: 0; font-size: 16px; font-weight: 700; }
-        .header span { font-size: 11px; color: #38BDF8; font-weight: bold; }
+        :root {
+            --bg: #F1F5F9;
+            --surface: #FFFFFF;
+            --primary: #0284C7;
+            --text-main: #0F172A;
+            --text-muted: #64748B;
+            --danger: #EF4444;
+            --success: #10B981;
+            --border: #E2E8F0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background-color: var(--bg); color: var(--text-main); padding-bottom: 70px; }
         
-        .nav-tabs { display: flex; background: #1E293B; border-radius: 8px; padding: 4px; margin-bottom: 14px; }
-        .nav-tab { flex: 1; padding: 10px 4px; text-align: center; color: #94A3B8; font-size: 11px; font-weight: 700; cursor: pointer; border: none; background: transparent; border-radius: 6px; }
-        .nav-tab.active { background: #FFF; color: #0F172A; }
-
-        .card { background: #FFF; border-radius: 12px; padding: 16px; margin-bottom: 14px; box-shadow: 0 2px 6px rgba(15,23,42,0.08); }
-        .field-group { margin-bottom: 12px; }
-        .field-group label { display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 5px; text-transform: uppercase; }
-        .row-group { display: flex; gap: 10px; }
-        .row-group .field-group { flex: 1; }
-        select, input { width: 100%; height: 44px; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 12px; font-size: 15px; font-weight: 600; outline: none; background: #FFF; }
-        select:focus, input:focus { border-color: #0284C7; }
-
-        .btn-row { display: flex; gap: 8px; margin-top: 14px; }
-        button { flex: 1; height: 48px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
-        .btn-primary { background: #0284C7; color: white; }
-        .btn-sec { background: #E2E8F0; color: #334155; flex: 0.4; }
-        .btn-success { background: #16A34A; color: white; width: 100%; margin-bottom: 8px; }
-        .btn-danger-outline { background: #FFF; border: 1px solid #EF4444; color: #EF4444; width: 100%; margin-top: 10px; }
+        header { background-color: #0F172A; color: white; padding: 16px; text-align: center; font-weight: bold; font-size: 18px; position: sticky; top: 0; z-index: 10; }
         
-        .active-alert-item { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .active-alert-info { font-size: 12px; font-weight: 700; color: #0F172A; }
-        .active-alert-sub { font-size: 10px; color: #64748B; margin-top: 2px; }
-        .alert-actions { display: flex; gap: 6px; }
-        .btn-edit-alert { background: #E0F2FE; color: #0284C7; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; height: auto; flex: none; }
-        .btn-delete-alert { background: #FEE2E2; color: #DC2626; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; height: auto; flex: none; }
-
-        .kpi-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-        .kpi { border-radius: 10px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
-        .kpi-title { font-size: 12px; font-weight: 700; }
-        .kpi-sub { font-size: 10px; opacity: 0.8; }
-        .kpi-val { font-size: 22px; font-weight: 800; }
-        .kpi-purple { background: #FAF5FF; border: 1px solid #E9D5FF; color: #6B21A8; }
-        .kpi-green { background: #F0FDF4; border: 1px solid #BBF7D0; color: #166534; }
-        .kpi-blue { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF; }
-        .kpi-yellow { background: #FEFCE8; border: 1px solid #FEF08A; color: #854D0E; }
-
-        .calculator-card { background: #FFF; border: 1px solid #CBD5E1; border-radius: 10px; padding: 14px; margin-bottom: 14px; display: none; }
-        .calc-title { font-size: 12px; font-weight: 700; color: #334155; text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .calc-row { display: flex; gap: 8px; margin-bottom: 8px; }
-        .calc-row .field-group { flex: 1; margin-bottom: 0; }
-        .calc-row .field-group label { font-size: 10px; }
-        .calc-row input { height: 38px; font-size: 13px; }
-        .calc-result { background: #0F172A; color: #FFF; border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
-        .calc-result-lbl { font-size: 11px; font-weight: 700; color: #38BDF8; }
-        .calc-result-val { font-size: 18px; font-weight: 800; color: #FFF; }
-
-        .status-bar { font-size: 12px; color: #475569; margin-bottom: 12px; padding: 10px 12px; background: #FFF; border-radius: 8px; border: 1px solid #E2E8F0; }
-        .listing-card { background: #FFF; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #E2E8F0; }
-        .listing-info { flex: 1; padding-right: 10px; }
-        .listing-title { font-size: 13px; font-weight: 700; color: #0F172A; margin-bottom: 4px; }
-        .listing-meta { font-size: 11px; color: #64748B; display: flex; gap: 8px; flex-wrap: wrap; }
-        .year-badge { background: #0284C7; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 10px; }
-        .listing-repaired-col { text-align: center; padding: 0 10px; border-left: 1px solid #F1F5F9; border-right: 1px solid #F1F5F9; margin-right: 10px; }
-        .listing-repaired-lbl { font-size: 9px; color: #64748B; font-weight: 700; text-transform: uppercase; }
-        .listing-repaired-val { font-size: 13px; font-weight: 800; color: #6B21A8; }
-        .listing-price-col { text-align: right; }
-        .listing-price { font-size: 15px; font-weight: 800; color: #0284C7; margin-bottom: 4px; }
-        .btn-view { background: #0F172A; color: white; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-decoration: none; display: inline-block; }
+        .container { padding: 16px; display: none; }
+        .container.active { display: block; }
         
-        .listing-date-col { text-align: center; padding: 0 10px; border-left: 1px solid #F1F5F9; border-right: 1px solid #F1F5F9; margin-right: 10px; }
-        .listing-date-lbl { font-size: 9px; color: #64748B; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
-        .listing-date-val { font-size: 11px; font-weight: 800; color: #0F172A; }
+        .card { background: var(--surface); border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .card-title { font-size: 15px; font-weight: bold; margin-bottom: 12px; color: var(--primary); }
+        
+        label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: var(--text-muted); }
+        select, input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; font-size: 14px; background: white; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; color: white; }
+        .btn-primary { background-color: var(--primary); }
+        .btn-danger { background-color: var(--danger); padding: 8px; font-size: 12px; margin-top: 8px; }
+        .btn-success { background-color: var(--success); }
+        
+        .list-item { border-bottom: 1px solid var(--border); padding: 12px 0; }
+        .list-item:last-child { border-bottom: none; }
+        .item-title { font-weight: bold; font-size: 14px; margin-bottom: 4px; }
+        .item-sub { font-size: 12px; color: var(--text-muted); }
+        
+        /* Bottom Navigation */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; border-top: 1px solid var(--border); }
+        .nav-btn { flex: 1; padding: 16px; text-align: center; color: var(--text-muted); font-size: 14px; font-weight: bold; cursor: pointer; border-radius: 0; background: transparent; }
+        .nav-btn.active { color: var(--primary); border-top: 3px solid var(--primary); background: #F8FAFC; }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h1>PJ MARKET VALUATION</h1>
-        <span id="modeTitle">Standard Valuation</span>
-    </div>
+    <header>🚗 PJ Auto Alerts</header>
 
-  <div class="nav-tabs">
-        <button class="nav-tab active" id="tabStandard" onclick="switchMode('cars')">Standard</button>
-        <button class="nav-tab" id="tabSalvage" onclick="switchMode('damagedcars')">Salvage</button>
-        <button class="nav-tab" id="tabAlerts" onclick="switchMode('alerts')">Alerts</button>
-        <button class="nav-tab" id="tabHitList" onclick="switchMode('hitlist')">🎯 Hit List</button>
-    </div>
-
-    <!-- MAIN SEARCH CARD -->
-    <div class="card" id="searchCard">
-        <div class="field-group">
-            <label>Make</label>
-            <select id="makeSelect" onchange="updateModels()"></select>
+    <!-- TAB 1: CLOUD SCANNERS -->
+    <div id="tab-scanners" class="container active">
+        <div class="card">
+            <div class="card-title">📡 Active Cloud Scanners</div>
+            <div id="scanners-list">
+                <p style="font-size: 13px; color: var(--text-muted);">Loading scanners from cloud...</p>
+            </div>
         </div>
-        <div class="field-group">
+
+        <div class="card">
+            <div class="card-title">➕ Add New Scanner</div>
+            
+            <div class="grid-2">
+                <div>
+                    <label>Category</label>
+                    <select id="new-section">
+                        <option value="cars">Standard Cars</option>
+                        <option value="damagedcars">Salvage / Damaged</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Make</label>
+                    <select id="new-make" onchange="updateModels()"></select>
+                </div>
+            </div>
+
             <label>Model</label>
-            <select id="modelSelect"></select>
-        </div>
-        <div class="row-group">
-            <div class="field-group"><label>Year From</label><select id="yearFromSelect"></select></div>
-            <div class="field-group"><label>Year To</label><select id="yearToSelect"></select></div>
-        </div>
-        <div class="btn-row">
-            <button class="btn-primary" onclick="lookupVehicle(false)">🔍 Check Market</button>
-            <button class="btn-sec" onclick="lookupVehicle(true)">⚡ Live</button>
-        </div>
-    </div>
+            <select id="new-model"></select>
 
-    <!-- HIT LIST CARD -->
-    <div class="card" id="hitListCard" style="display: none;">
-        <h3 style="margin-top:0; font-size:14px; color:#DC2626;">🎯 Stagnant Inventory (45+ Days)</h3>
-        <div style="font-size: 11px; color: #64748B; margin-bottom: 12px;">High-leverage vehicles sitting past their prime. Ready for lowball cash offers.</div>
-        
-        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
-            <button class="btn-primary" onclick="loadHitList('damagedcars')" id="btnHitSalvage">💥 Salvage Hit List</button>
-            <button class="btn-sec" onclick="loadHitList('cars')" id="btnHitStandard">🚗 Standard Hit List</button>
-        </div>
-
-        <div id="hitListFeed">
-            <div style="font-size: 12px; color: #64748B; font-style: italic;">Select a category above to scan your targets...</div>
-        </div>
-    </div>
-
-    <!-- AUTO ALERTS CARD -->
-    <div class="card" id="alertsCard" style="display: none;">
-        <h3 style="margin-top:0; font-size:14px; color:#0F172A;">Active Background Scanners</h3>
-        <div id="activeAlertsList" style="margin-bottom: 16px;"></div>
-
-        <button class="btn-danger-outline" onclick="clearAlertCache()">🔄 Clear Sent-Ad Cache & Re-run</button>
-        <div id="cacheFeedback" style="font-size: 11px; margin-top: 6px; color: #EF4444; text-align: center;"></div>
-
-        <hr style="border:0; border-top:1px solid #E2E8F0; margin: 16px 0;">
-
-        <h3 id="formTitle" style="margin-top:0; font-size:14px; color:#0F172A;">Add New Alert</h3>
-        <div class="field-group">
-            <label>Target Category</label>
-            <select id="alertSection">
-                <option value="damagedcars">Damaged / Salvage (Prep Projects)</option>
-                <option value="cars">Standard Market (Ready to Drive)</option>
-            </select>
-        </div>
-        <div class="row-group">
-            <div class="field-group"><label>Make</label><select id="alertMake" onchange="updateAlertModels()"></select></div>
-            <div class="field-group"><label>Model</label><select id="alertModel"></select></div>
-        </div>
-        <div class="row-group">
-            <div class="field-group"><label>Year From</label><select id="alertYearFrom"></select></div>
-            <div class="field-group"><label>Year To</label><select id="alertYearTo"></select></div>
-        </div>
-        <div class="row-group">
-            <div class="field-group"><label>Min Buy-in (€)</label><input type="number" id="alertMinPrice" placeholder="500" value="500"></div>
-            <div class="field-group"><label>Max Buy-in (€)</label><input type="number" id="alertPrice" placeholder="3000" value="3000"></div>
-            <div class="field-group"><label>Min DOM (Days)</label><input type="number" id="alertMinDom" placeholder="0" value="0"></div>
-        </div>
-        
-        <div style="margin-top: 10px; display: flex; gap: 8px;" id="formBtnRow">
-            <button class="btn-success" id="saveAlertBtn" onclick="saveAlert()">＋ Add Alert to Scanners</button>
-        </div>
-        <div id="alertFeedback" style="font-size: 11px; margin-top: 10px; color: #0284C7; text-align: center;"></div>
-
-        <hr style="border:0; border-top:1px solid #E2E8F0; margin: 16px 0;">
-
-        <h3 style="margin-top:0; font-size:14px; color:#166534;">⚡ Live Matching Vehicles Found</h3>
-        <div id="matchedListingsFeed" style="margin-bottom: 0;">
-            <div style="font-size: 12px; color: #64748B; font-style: italic;">Scanning active profiles...</div>
-        </div>
-    </div>
-
-    <!-- KPI DASHBOARD -->
-    <div class="kpi-container" id="kpiDashboard">
-        <div class="kpi kpi-purple" id="kpiRepaired" style="display: none;">
-            <div><div class="kpi-title">EST. REPAIRED VALUE</div><div class="kpi-sub">Standard Market Average</div></div>
-            <div class="kpi-val" id="statRepaired">€0</div>
-        </div>
-        <div class="kpi kpi-green">
-            <div><div class="kpi-title" id="lblHigh">DEALER / RETAIL (MINT)</div><div class="kpi-sub" id="subHigh">Clean NCT / Forecourt Guide</div></div>
-            <div class="kpi-val" id="statHigh">€0</div>
-        </div>
-        <div class="kpi kpi-blue">
-            <div><div class="kpi-title" id="lblAvg">MARKET AVERAGE</div><div class="kpi-sub" id="subAvg">Typical Asking Price</div></div>
-            <div class="kpi-val" id="statAvg">€0</div>
-        </div>
-        <div class="kpi kpi-yellow">
-            <div><div class="kpi-title" id="lblLow">TRADE / BUY TARGET</div><div class="kpi-sub" id="subLow">Short NCT / Prep Project</div></div>
-            <div class="kpi-val" id="statLow">€0</div>
-        </div>
-    </div>
-
-    <!-- MARGIN & REPAIR CALCULATOR BOX -->
-    <div class="calculator-card" id="marginCalcCard">
-        <div class="calc-title">
-            <span id="calcTitleText">⚙️ Trade Buy-In & Margin Calculator</span>
-            <span style="font-size: 10px; color: #64748B;" id="calcSubText">Based on Market Avg</span>
-        </div>
-        <div class="calc-row">
-            <div class="field-group">
-                <label id="calcCostLabel">Est. Parts / Repairs (€)</label>
-                <input type="number" id="calcRepairCost" value="800" oninput="calculateTradeMargin()">
+            <div class="grid-2">
+                <div><label>Year From</label><input type="number" id="new-yfrom" value="2010"></div>
+                <div><label>Year To</label><input type="number" id="new-yto" value="2026"></div>
+                <div><label>Min Price (€)</label><input type="number" id="new-pmin" value="500"></div>
+                <div><label>Max Price (€)</label><input type="number" id="new-pmax" value="3000"></div>
+                <div><label>Min Days on Market</label><input type="number" id="new-dom" value="0"></div>
             </div>
-            <div class="field-group">
-                <label>Target Profit (€)</label>
-                <input type="number" id="calcTargetProfit" value="1500" oninput="calculateTradeMargin()">
+
+            <button class="btn-primary" onclick="addScanner()" id="add-btn">Save to Cloud Scanners</button>
+        </div>
+    </div>
+
+    <!-- TAB 2: SHORTLIST -->
+    <div id="tab-shortlist" class="container">
+        <div class="card">
+            <div class="card-title">⭐ Save to Shortlist</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Found a good ad on the DoneDeal app? Paste the link here to save it.</p>
+            <label>DoneDeal Ad URL / Title</label>
+            <input type="text" id="shortlist-url" placeholder="https://www.donedeal.ie/cars-for-sale/...">
+            <button class="btn-success" onclick="addToShortlist()">Add to Shortlist</button>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📌 Your Saved Vehicles</div>
+            <div id="shortlist-items">
+                <p style="font-size: 13px; color: var(--text-muted);">Your shortlist is empty.</p>
             </div>
         </div>
-        <div class="calc-result">
-            <span class="calc-result-lbl" id="calcResultLbl">MAX SAFE BUY-IN CEILING</span>
-            <span class="calc-result-val" id="calcMaxBuyIn">€0</span>
-        </div>
     </div>
 
-    <div class="status-bar" id="statusBar">Ready. Select vehicle and tap Check Market.</div>
-    <div id="listingsList"></div>
+    <!-- BOTTOM NAVIGATION -->
+    <div class="bottom-nav">
+        <div class="nav-btn active" onclick="switchTab('scanners', this)">📡 Scanners</div>
+        <div class="nav-btn" onclick="switchTab('shortlist', this)">⭐ Shortlist</div>
+    </div>
 
     <script>
-        let currentSection = 'cars';
-        const API_URL = 'https://pj-val-proxy.pauljordanie.workers.dev';
-        let savedAlerts = [];
-        let editingIndex = null;
-        let currentMarketAvg = 0;
-        let currentRepairedAvg = 0;
+        const CLOUDFLARE_API = 'https://pj-val-proxy.pauljordanie.workers.dev/api/config';
+        let cloudConfigs = [];
+        let shortlist = JSON.parse(localStorage.getItem('pj_shortlist')) || [];
 
-        const models = {
+        const carData = {
+            'Volkswagen': ['Golf', 'Passat', 'Polo', 'Tiguan', 'Caddy', 'Transporter'],
+            'Ford': ['Focus', 'Fiesta', 'Mondeo', 'Kuga', 'Transit Connect', 'Transit'],
             'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note'],
-            'Ford': ['Focus', 'Fiesta', 'Mondeo', 'Kuga', 'Transit Connect'],
-            'Volkswagen': ['Golf', 'Passat', 'Polo', 'Tiguan', 'Caddy'],
-            'Peugeot': ['208', '308', '2008', '3008', '5008', '508'],
+            'Peugeot': ['208', '308', '2008', '3008', '5008', 'Partner'],
+            'Toyota': ['Corolla', 'Yaris', 'Avensis', 'Auris', 'Prius', 'Land Cruiser'],
             'Hyundai': ['Tucson', 'i30', 'i40', 'Santa Fe', 'Kona'],
-            'Citroen': ['C3', 'C4', 'Berlingo', 'C4 Cactus']
+            'Kia': ['Sportage', 'Ceed', 'Sorento', 'Rio'],
+            'Audi': ['A3', 'A4', 'A6', 'Q3', 'Q5'],
+            'BMW': ['3 Series', '5 Series', '1 Series', 'X3', 'X5'],
+            'Skoda': ['Octavia', 'Superb', 'Fabia', "Kodiaq"],
+            'Renault': ['Clio', 'Megane', 'Captur', 'Kadjar', 'Trafic']
         };
 
-        function initDropdowns() {
-            const makes = Object.keys(models);
-            const mSel = document.getElementById('makeSelect');
-            const aSel = document.getElementById('alertMake');
-            
-            makes.forEach(m => {
-                mSel.appendChild(new Option(m, m));
-                aSel.appendChild(new Option(m, m));
-            });
-
-            const yFrom = document.getElementById('yearFromSelect');
-            const yTo = document.getElementById('yearToSelect');
-            const aYFrom = document.getElementById('alertYearFrom');
-            const aYTo = document.getElementById('alertYearTo');
-
-            for (let y = new Date().getFullYear(); y >= 2006; y--) {
-                yFrom.appendChild(new Option(y, y, false, y === 2018));
-                yTo.appendChild(new Option(y, y, false, y === 2018));
-                aYFrom.appendChild(new Option(y, y, false, y === 2010));
-                aYTo.appendChild(new Option(y, y, false, y === new Date().getFullYear()));
+        function initApp() {
+            const makeSelect = document.getElementById('new-make');
+            for (const make in carData) {
+                makeSelect.innerHTML += `<option value="${make}">${make}</option>`;
             }
+            makeSelect.value = 'Ford';
             updateModels();
-            updateAlertModels();
-            loadAlertConfig();
+            fetchConfigs();
+            renderShortlist();
         }
 
         function updateModels() {
-            const make = document.getElementById('makeSelect').value;
-            const modelSel = document.getElementById('modelSelect');
-            modelSel.innerHTML = '';
-            models[make].forEach(m => modelSel.appendChild(new Option(m, m)));
-        }
-
-        function updateAlertModels() {
-            const make = document.getElementById('alertMake').value;
-            const modelSel = document.getElementById('alertModel');
-            modelSel.innerHTML = '';
-            models[make].forEach(m => modelSel.appendChild(new Option(m, m)));
-        }
-
-        function switchMode(section) {
-            document.getElementById('tabStandard').className = section === 'cars' ? 'nav-tab active' : 'nav-tab';
-            document.getElementById('tabSalvage').className = section === 'damagedcars' ? 'nav-tab active' : 'nav-tab';
-            document.getElementById('tabHitList').className = section === 'hitlist' ? 'nav-tab active' : 'nav-tab';
-            document.getElementById('tabAlerts').className = section === 'alerts' ? 'nav-tab active' : 'nav-tab';
-
-            document.getElementById('searchCard').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
-            document.getElementById('kpiDashboard').style.display = (section === 'cars' || section === 'damagedcars') ? 'flex' : 'none';
-            document.getElementById('marginCalcCard').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
-            document.getElementById('statusBar').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
-            document.getElementById('listingsList').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
-            document.getElementById('alertsCard').style.display = section === 'alerts' ? 'block' : 'none';
-            document.getElementById('hitListCard').style.display = section === 'hitlist' ? 'block' : 'none';
-
-            if (section === 'alerts') {
-                document.getElementById('modeTitle').innerText = 'Multi-Alert Scanners';
-                loadAlertConfig().then(() => triggerInstantScan());
-            } else if (section === 'hitlist') {
-                document.getElementById('modeTitle').innerText = '🎯 Stagnant Hit List';
-                loadAlertConfig().then(() => loadHitList('damagedcars')); // Defaults to loading Salvage hit list
-            } else {
-                currentSection = section;
-                document.getElementById('modeTitle').innerText = section === 'cars' ? 'Standard Valuation' : 'Damaged / Salvage';
-                document.getElementById('kpiRepaired').style.display = section === 'damagedcars' ? 'flex' : 'none';
-
-                if (section === 'damagedcars') {
-                    document.getElementById('lblHigh').innerText = 'HIGHEST SALVAGE ASKING';
-                    document.getElementById('subHigh').innerText = 'Minor Damage / High Spec';
-                    document.getElementById('lblAvg').innerText = 'AVERAGE REPAIRABLE ASKING';
-                    document.getElementById('subAvg').innerText = 'Median Salvage Price';
-                    document.getElementById('lblLow').innerText = 'LOWEST SALVAGE BUY-IN';
-                    document.getElementById('subLow').innerText = 'Bottom 15th %ile Target';
-
-                    document.getElementById('calcTitleText').innerText = '⚙️ Salvage Max Buy-In Calculator';
-                    document.getElementById('calcSubText').innerText = 'Based on Repaired Market Value';
-                    document.getElementById('calcCostLabel').innerText = 'Est. Repairs & Parts (€)';
-                    document.getElementById('calcResultLbl').innerText = 'MAX SAFE SALVAGE BUY-IN';
-                } else {
-                    document.getElementById('lblHigh').innerText = 'DEALER / RETAIL (MINT)';
-                    document.getElementById('subHigh').innerText = 'Clean NCT / Forecourt Guide';
-                    document.getElementById('lblAvg').innerText = 'MARKET AVERAGE';
-                    document.getElementById('subAvg').innerText = 'Typical Asking Price';
-                    document.getElementById('lblLow').innerText = 'TRADE / BUY TARGET';
-                    document.getElementById('subLow').innerText = 'Short NCT / Prep Project';
-
-                    document.getElementById('calcTitleText').innerText = '⚙️ Trade Buy-In & Margin Calculator';
-                    document.getElementById('calcSubText').innerText = 'Based on Market Avg';
-                    document.getElementById('calcCostLabel').innerText = 'Est. Parts / Repairs (€)';
-                    document.getElementById('calcResultLbl').innerText = 'MAX SAFE BUY-IN CEILING';
-                }
-                calculateTradeMargin();
-            }
-        }
-
-        // ==========================================
-        // 🎯 STAGNANT HIT LIST LOGIC
-        // ==========================================
-        async function loadHitList(category) {
-            document.getElementById('btnHitSalvage').className = category === 'damagedcars' ? 'btn-primary' : 'btn-sec';
-            document.getElementById('btnHitStandard').className = category === 'cars' ? 'btn-primary' : 'btn-sec';
-
-            const feed = document.getElementById('hitListFeed');
-            feed.innerHTML = '<div style="font-size:12px; color:#0284C7; font-style:italic;">Hunting for stagnant inventory (45+ Days)...</div>';
-
-            const targets = savedAlerts.filter(a => a.section === category);
-            if (targets.length === 0) {
-                feed.innerHTML = `<div style="font-size:12px; color:#64748B; font-style:italic;">No active scanners found for ${category === 'cars' ? 'Standard' : 'Salvage'}. Add scanners in the Alerts tab to pull their hit lists.</div>`;
-                return;
-            }
-
-            let stagnantListings = [];
-
-            for (let config of targets) {
-                try {
-                    // NEW: Appending &sort=publishdate+asc grabs the absolute oldest ads first!
-                    const url = `${API_URL}/?section=${category}&make=${encodeURIComponent(config.make)}&model=${encodeURIComponent(config.model)}&year_from=${config.yearFrom}&year_to=${config.yearTo}&sort=publishdate+asc`;
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    
-                    if (data && data.ads) {
-                        data.ads.forEach(ad => {
-                            let priceNum = parseFloat((ad.price||"").replace(/[^0-9.]/g, '')) || 0;
-                            if (priceNum >= config.minPrice && priceNum <= config.price) {
-                                if (ad.publishDate) {
-                                    let d = new Date(ad.publishDate);
-                                    let now = new Date();
-                                    let domDays = Math.floor(Math.abs(now - d) / (1000 * 60 * 60 * 24));
-                                    
-                                    // 45 DAY HIT LIST THRESHOLD
-                                    if (domDays >= 45) { 
-                                        let adUrl = ad.friendlyUrl ? (ad.friendlyUrl.startsWith('http') ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`) : `https://www.donedeal.ie/${category}-for-sale/view/${ad.id}`;
-                                        
-                                        let adYear = ad.year || "N/A";
-                                        if (adYear === "N/A") {
-                                            const yearMatch = (ad.header || "").match(/\b(20[0-2][0-9])\b/);
-                                            if (yearMatch) adYear = yearMatch[1];
-                                        }
-
-                                        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                                        let pubDateStr = `${d.getDate().toString().padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
-
-                                        if (!stagnantListings.find(l => l.url === adUrl)) {
-                                            stagnantListings.push({
-                                                title: ad.header,
-                                                year: adYear,
-                                                price: priceNum,
-                                                location: ad.county || 'Ireland',
-                                                url: adUrl,
-                                                date: pubDateStr,
-                                                dom: domDays,
-                                                model: config.model
-                                            });
-                                        }
-                                    }
-                                }
-                            }
-                        });
-                    }
-                } catch(e) { console.log(e); }
-            }
-
-            if (stagnantListings.length === 0) {
-                feed.innerHTML = '<div style="font-size:12px; color:#16A34A; font-style:italic;">No stagnant inventory found. The market is moving fast!</div>';
-                return;
-            }
-
-            stagnantListings.sort((a, b) => b.dom - a.dom); // Sort by stalest first
-
-            feed.innerHTML = '';
-            stagnantListings.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'listing-card';
-                div.innerHTML = `
-                    <div class="listing-info">
-                        <div class="listing-title">${item.title}</div>
-                        <div class="listing-meta">
-                            <span class="year-badge">${item.year}</span>
-                            <span>📍 ${item.location}</span>
-                        </div>
-                    </div>
-                    <div class="listing-date-col" style="background-color: #FEF2F2; padding: 4px 8px; border-radius: 6px; border: 1px solid #FECACA;">
-                        <div class="listing-date-lbl" style="color: #DC2626;">Stagnant</div>
-                        <div class="listing-date-val" style="color: #DC2626; font-size:13px;">⏳ ${item.dom} Days</div>
-                        <div style="font-size: 8px; color: #7F1D1D; margin-top:2px;">Since ${item.date}</div>
-                    </div>
-                    <div class="listing-price-col">
-                        <div class="listing-price" style="color: #0F172A;">€${Math.round(item.price).toLocaleString()}</div>
-                        <a href="${item.url}" target="_blank" class="btn-view" style="background:#DC2626;">Lowball ↗</a>
-                    </div>
-                `;
-                feed.appendChild(div);
-            });
-        }
-
-
-        // ==========================================
-        // STANDARD ALERTS & MARKET LOGIC
-        // ==========================================
-        async function clearAlertCache() {
-            const feedback = document.getElementById('cacheFeedback');
-            feedback.innerText = "Clearing sent-ad history...";
-            try {
-                const res = await fetch(`${API_URL}/api/clear-cache`);
-                const data = await res.json();
-                if (data.success) {
-                    feedback.innerText = "Cache cleared! Re-scanning...";
-                    setTimeout(() => feedback.innerText = '', 3000);
-                    triggerInstantScan();
-                } else {
-                    feedback.innerText = "Failed to clear cache.";
-                }
-            } catch(e) {
-                feedback.innerText = "Error clearing cache.";
-            }
-        }
-
-        async function triggerInstantScan() {
-            const feed = document.getElementById('matchedListingsFeed');
-            feed.innerHTML = '<div style="font-size:12px; color:#0284C7; font-style:italic;">Scanning active profiles...</div>';
-            
-            try {
-                const res = await fetch(`${API_URL}/api/scan-alerts`);
-                const data = await res.json();
-                
-                if (!data.matches || data.matches.length === 0) {
-                    feed.innerHTML = '<div style="font-size:12px; color:#64748B; font-style:italic;">No active listings currently match your criteria.</div>';
-                    return;
-                }
-
-                feed.innerHTML = '';
-                data.matches.forEach(item => {
-                    const domBadge = item.daysOnMarket !== undefined 
-                        ? `<div style="font-size:9px; color:#4b5563; background:#f3f4f6; padding:2px 4px; border-radius:4px; margin-top:4px; display:inline-block; font-weight:bold;">⏳ ${item.daysOnMarket} Days</div>` 
-                        : '';
-                        
-                    const div = document.createElement('div');
-                    div.className = 'listing-card';
-                    div.innerHTML = `
-                        <div class="listing-info">
-                            <div class="listing-title">${item.title}</div>
-                            <div class="listing-meta">
-                                <span class="year-badge">${item.year}</span>
-                                <span>📍 ${item.location}</span>
-                            </div>
-                            <div class="listing-meta" style="margin-top: 4px;">
-                                <span style="color:#0284C7; font-weight:bold;">[${item.searchProfile}]</span>
-                            </div>
-                        </div>
-                        <div class="listing-date-col">
-                            <div class="listing-date-lbl">Posted</div>
-                            <div class="listing-date-val">${item.publishedDate || 'Recent'}</div>
-                            ${domBadge}
-                        </div>
-                        <div class="listing-price-col">
-                            <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
-                            <a href="${item.url}" target="_blank" class="btn-view">View Ad ↗</a>
-                        </div>
-                    `;
-                    feed.appendChild(div);
+            const make = document.getElementById('new-make').value;
+            const modelSelect = document.getElementById('new-model');
+            modelSelect.innerHTML = `<option value="Any">Any Model</option>`;
+            if (carData[make]) {
+                carData[make].forEach(model => {
+                    modelSelect.innerHTML += `<option value="${model}">${model}</option>`;
                 });
-            } catch(e) {
-                feed.innerHTML = '<div style="font-size:12px; color:#DC2626; font-style:italic;">Failed to run instant scan.</div>';
             }
         }
 
-        function calculateTradeMargin() {
-            const repairs = parseFloat(document.getElementById('calcRepairCost').value) || 0;
-            const profit = parseFloat(document.getElementById('calcTargetProfit').value) || 0;
+        function switchTab(tabId, element) {
+            document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
             
-            let baseValue = currentSection === 'damagedcars' ? currentRepairedAvg : currentMarketAvg;
-            
-            if (baseValue <= 0) {
-                document.getElementById('calcMaxBuyIn').innerText = '€0 (Run Check Market first)';
-                return;
-            }
-
-            const maxBuyIn = baseValue - repairs - profit;
-            document.getElementById('calcMaxBuyIn').innerText = maxBuyIn > 0 ? '€' + Math.round(maxBuyIn).toLocaleString() : '€0 (Too tight)';
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            element.classList.add('active');
         }
 
-        async function loadAlertConfig() {
+        async function fetchConfigs() {
             try {
-                const res = await fetch(`${API_URL}/api/config`);
-                const data = await res.json();
-                savedAlerts = Array.isArray(data) ? data : [];
-                renderActiveAlerts();
-            } catch(e) { savedAlerts = []; }
+                const res = await fetch(CLOUDFLARE_API);
+                cloudConfigs = await res.json();
+                renderConfigs();
+            } catch (err) {
+                document.getElementById('scanners-list').innerHTML = `<p style="color:red; font-size:12px;">Failed to load cloud configurations.</p>`;
+            }
         }
 
-        function renderActiveAlerts() {
-            const container = document.getElementById('activeAlertsList');
-            if (savedAlerts.length === 0) {
-                container.innerHTML = '<div style="font-size:12px; color:#64748B; font-style:italic;">No active background scanners configured.</div>';
+        function renderConfigs() {
+            const list = document.getElementById('scanners-list');
+            list.innerHTML = '';
+            if (cloudConfigs.length === 0) {
+                list.innerHTML = `<p style="font-size: 13px; color: var(--text-muted);">No active scanners running.</p>`;
                 return;
             }
-
-            container.innerHTML = '';
-            savedAlerts.forEach((alert, index) => {
-                const typeText = alert.section === 'cars' ? 'Standard' : 'Salvage';
-                const minP = alert.minPrice ? `Min: €${alert.minPrice} | ` : '';
-                const domTxt = alert.minDom > 0 ? `DOM: ${alert.minDom}+ | ` : '';
-                const div = document.createElement('div');
-                div.className = 'active-alert-item';
-                div.innerHTML = `
-                    <div>
-                        <div class="active-alert-info">${alert.make} ${alert.model} (${typeText})</div>
-                        <div class="active-alert-sub">Years: ${alert.yearFrom}-${alert.yearTo} | ${domTxt}${minP}Max: €${alert.price}</div>
-                    </div>
-                    <div class="alert-actions">
-                        <button class="btn-edit-alert" onclick="editAlert(${index})">Edit</button>
-                        <button class="btn-delete-alert" onclick="deleteAlert(${index})">Remove</button>
+            
+            cloudConfigs.forEach((c, index) => {
+                const tag = c.section === 'cars' ? 'Standard' : 'Salvage';
+                list.innerHTML += `
+                    <div class="list-item">
+                        <div class="item-title">[${tag}] ${c.make} ${c.model}</div>
+                        <div class="item-sub">Yrs: ${c.yearFrom}-${c.yearTo} | €${c.minPrice} - €${c.price} | DOM: ${c.minDom}+</div>
+                        <button class="btn-danger" onclick="deleteScanner(${index})">🗑️ Remove</button>
                     </div>
                 `;
-                container.appendChild(div);
             });
         }
 
-        function editAlert(index) {
-            const alert = savedAlerts[index];
-            editingIndex = index;
+        async function addScanner() {
+            const btn = document.getElementById('add-btn');
+            btn.innerText = 'Saving...'; btn.disabled = true;
 
-            document.getElementById('alertSection').value = alert.section;
-            document.getElementById('alertMake').value = alert.make;
-            updateAlertModels();
-            document.getElementById('alertModel').value = alert.model;
-            document.getElementById('alertYearFrom').value = alert.yearFrom;
-            document.getElementById('alertYearTo').value = alert.yearTo;
-            document.getElementById('alertMinPrice').value = alert.minPrice || 500;
-            document.getElementById('alertPrice').value = alert.price;
-            document.getElementById('alertMinDom').value = alert.minDom || 0;
-
-            document.getElementById('formTitle').innerText = 'Edit Active Alert';
-            document.getElementById('saveAlertBtn').innerText = '💾 Update Alert';
-            
-            if (!document.getElementById('cancelEditBtn')) {
-                const btnRow = document.getElementById('formBtnRow');
-                const cancelBtn = document.createElement('button');
-                cancelBtn.id = 'cancelEditBtn';
-                cancelBtn.className = 'btn-sec';
-                cancelBtn.style.flex = '0.5';
-                cancelBtn.innerText = 'Cancel';
-                cancelBtn.onclick = resetAlertForm;
-                btnRow.appendChild(cancelBtn);
-            }
-
-            window.scrollTo({ top: document.getElementById('formTitle').offsetTop - 20, behavior: 'smooth' });
-        }
-
-        function resetAlertForm() {
-            editingIndex = null;
-            document.getElementById('formTitle').innerText = 'Add New Alert';
-            document.getElementById('saveAlertBtn').innerText = '＋ Add Alert to Scanners';
-            const cancelBtn = document.getElementById('cancelEditBtn');
-            if (cancelBtn) cancelBtn.remove();
-        }
-
-        async function saveAlert() {
-            const feedback = document.getElementById('alertFeedback');
-            feedback.innerText = editingIndex !== null ? "Updating alert..." : "Adding alert...";
-
-            const alertData = {
+            const newConf = {
                 active: true,
-                section: document.getElementById('alertSection').value,
-                make: document.getElementById('alertMake').value,
-                model: document.getElementById('alertModel').value,
-                yearFrom: document.getElementById('alertYearFrom').value,
-                yearTo: document.getElementById('alertYearTo').value,
-                minPrice: document.getElementById('alertMinPrice').value,
-                price: document.getElementById('alertPrice').value,
-                minDom: document.getElementById('alertMinDom').value
+                section: document.getElementById('new-section').value,
+                make: document.getElementById('new-make').value,
+                model: document.getElementById('new-model').value,
+                yearFrom: parseInt(document.getElementById('new-yfrom').value),
+                yearTo: parseInt(document.getElementById('new-yto').value),
+                minPrice: parseInt(document.getElementById('new-pmin').value),
+                price: parseInt(document.getElementById('new-pmax').value),
+                minDom: parseInt(document.getElementById('new-dom').value)
             };
 
-            if (editingIndex !== null) {
-                savedAlerts[editingIndex] = alertData;
-            } else {
-                savedAlerts.push(alertData);
-            }
-
-            try {
-                await fetch(`${API_URL}/api/config`, {
-                    method: 'POST',
-                    body: JSON.stringify(savedAlerts)
-                });
-                feedback.innerText = editingIndex !== null ? "Alert updated successfully!" : "Scanner added successfully!";
-                setTimeout(() => feedback.innerText = '', 3000);
-                resetAlertForm();
-                renderActiveAlerts();
-                triggerInstantScan();
-            } catch(e) {
-                feedback.innerText = "Error saving alert.";
-            }
-        }
-
-        async function deleteAlert(index) {
-            if (editingIndex === index) {
-                resetAlertForm();
-            }
-            savedAlerts.splice(index, 1);
-            try {
-                await fetch(`${API_URL}/api/config`, {
-                    method: 'POST',
-                    body: JSON.stringify(savedAlerts)
-                });
-                renderActiveAlerts();
-                triggerInstantScan();
-            } catch(e) {
-                alert("Error removing alert.");
-            }
-        }
-
-        function getPercentile(arr, p) {
-            if (arr.length === 0) return 0;
-            return arr[Math.min(Math.floor((p / 100) * arr.length), arr.length - 1)];
-        }
-
-        async function lookupVehicle(forceFresh) {
-            const make = document.getElementById('makeSelect').value;
-            const model = document.getElementById('modelSelect').value;
-            const yearFrom = document.getElementById('yearFromSelect').value;
-            const yearTo = document.getElementById('yearToSelect').value;
-            const status = document.getElementById('statusBar');
-            status.innerText = `Querying live DoneDeal market...`;
-
-            const primaryUrl = `${API_URL}/?section=${currentSection}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
-            const fetchPromises = [ fetch(primaryUrl).then(r => r.ok ? r.json() : null).catch(()=>null) ];
+            cloudConfigs.push(newConf);
             
-            let stdIndex = -1, stdAvg = 0;
-            if (currentSection === 'damagedcars') {
-                const stdUrl = `${API_URL}/?section=cars&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year_from=${yearFrom}&year_to=${yearTo}`;
-                stdIndex = fetchPromises.length;
-                fetchPromises.push(fetch(stdUrl).then(r => r.ok ? r.json() : null).catch(()=>null));
-            }
-
-            const results = await Promise.all(fetchPromises);
-            const data = results[0];
-
-            if (stdIndex !== -1 && results[stdIndex] && results[stdIndex].ads) {
-                let stdPrices = [];
-                results[stdIndex].ads.forEach(ad => {
-                    let p = parseFloat((ad.price||"").replace(/[^0-9.]/g, ''))||0;
-                    if (p >= 400) stdPrices.push(p);
+            try {
+                await fetch(CLOUDFLARE_API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cloudConfigs)
                 });
-                if (stdPrices.length > 0) {
-                    stdPrices.sort((a,b) => a - b);
-                    stdAvg = getPercentile(stdPrices, 50);
-                }
+                renderConfigs();
+                alert('Scanner successfully synced to Cloudflare!');
+            } catch (err) {
+                alert('Failed to save to cloud.');
             }
+            btn.innerText = 'Save to Cloud Scanners'; btn.disabled = false;
+        }
 
-            if (!data || !data.ads || data.ads.length === 0) {
-                status.innerText = `No listings returned via worker bridge.`;
+        async function deleteScanner(index) {
+            if(!confirm('Remove this scanner from the cloud?')) return;
+            cloudConfigs.splice(index, 1);
+            try {
+                await fetch(CLOUDFLARE_API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cloudConfigs)
+                });
+                renderConfigs();
+            } catch (err) { alert('Failed to delete.'); }
+        }
+
+        // --- SHORTLIST LOGIC ---
+        function addToShortlist() {
+            const input = document.getElementById('shortlist-url');
+            const val = input.value.trim();
+            if (!val) return;
+
+            const isUrl = val.startsWith('http');
+            const title = isUrl ? 'Saved Ad Link' : val;
+            const url = isUrl ? val : '#';
+
+            shortlist.unshift({
+                title: title,
+                url: url,
+                dateAdded: new Date().toLocaleDateString('en-GB')
+            });
+
+            localStorage.setItem('pj_shortlist', JSON.stringify(shortlist));
+            input.value = '';
+            renderShortlist();
+        }
+
+        function removeShortlist(index) {
+            shortlist.splice(index, 1);
+            localStorage.setItem('pj_shortlist', JSON.stringify(shortlist));
+            renderShortlist();
+        }
+
+        function renderShortlist() {
+            const list = document.getElementById('shortlist-items');
+            list.innerHTML = '';
+            if (shortlist.length === 0) {
+                list.innerHTML = `<p style="font-size: 13px; color: var(--text-muted);">Your shortlist is empty.</p>`;
                 return;
             }
 
-            let listings = [];
-            let prices = [];
-            const minP = currentSection === 'damagedcars' ? 150 : 400;
-
-            data.ads.forEach(ad => {
-                let priceNum = parseFloat((ad.price||"").replace(/[^0-9.]/g, '')) || 0;
-                if (priceNum >= minP) {
-                    let adUrl = ad.friendlyUrl ? (ad.friendlyUrl.startsWith('http') ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`) : `https://www.donedeal.ie/${currentSection}-for-sale/view/${ad.id}`;
-                    let adYear = ad.year || yearFrom;
-                    if (!ad.year) {
-                        const yearMatch = (ad.header || "").match(/\b(20[0-2][0-9])\b/);
-                        if (yearMatch) adYear = yearMatch[1];
-                    }
-
-                    let pubDateStr = "Recent";
-                    let domBadgeHtml = "";
-                    if (ad.publishDate) {
-                        let d = new Date(ad.publishDate);
-                        let now = new Date();
-                        let diffTime = Math.abs(now - d);
-                        let domDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                        
-                        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                        pubDateStr = `${d.getDate().toString().padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
-                        
-                        domBadgeHtml = `<div style="font-size:9px; color:#4b5563; background:#f3f4f6; padding:2px 4px; border-radius:4px; margin-top:4px; display:inline-block; font-weight:bold;">⏳ ${domDays} Days</div>`;
-                    }
-
-                    listings.push({ 
-                        title: ad.header, 
-                        year: adYear, 
-                        price: priceNum, 
-                        location: ad.county || 'Ireland', 
-                        url: adUrl, 
-                        date: pubDateStr,
-                        domBadge: domBadgeHtml
-                    });
-                    prices.push(priceNum);
-                }
-            });
-
-            if (prices.length === 0) { status.innerText = 'No realistic asking prices found.'; return; }
-            prices.sort((a, b) => a - b);
-            
-            const marketAvgVal = getPercentile(prices, 50);
-            
-            if (currentSection === 'cars') {
-                currentMarketAvg = marketAvgVal;
-            } else if (currentSection === 'damagedcars') {
-                currentRepairedAvg = stdAvg;
-            }
-            calculateTradeMargin();
-
-            document.getElementById('statHigh').innerText = '€' + Math.round(getPercentile(prices, 85)).toLocaleString();
-            document.getElementById('statAvg').innerText = '€' + Math.round(marketAvgVal).toLocaleString();
-            document.getElementById('statLow').innerText = '€' + Math.round(getPercentile(prices, 15)).toLocaleString();
-            if (currentSection === 'damagedcars') document.getElementById('statRepaired').innerText = stdAvg > 0 ? '€' + Math.round(stdAvg).toLocaleString() : 'N/A';
-
-            const container = document.getElementById('listingsList');
-            container.innerHTML = '';
-            
-            listings.sort((a, b) => b.price - a.price).forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'listing-card';
-                let midCol = currentSection === 'damagedcars' && stdAvg > 0 ? `<div class="listing-repaired-col"><div class="listing-repaired-lbl">RepAvg</div><div class="listing-repaired-val">€${Math.round(stdAvg).toLocaleString()}</div></div>` : '';
-                
-                div.innerHTML = `
-                    <div class="listing-info">
-                        <div class="listing-title">${item.title}</div>
-                        <div class="listing-meta">
-                            <span class="year-badge">${item.year}</span>
-                            <span>📍 ${item.location}</span>
-                        </div>
-                    </div>
-                    <div class="listing-date-col">
-                        <div class="listing-date-lbl">Posted</div>
-                        <div class="listing-date-val">${item.date}</div>
-                        ${item.domBadge}
-                    </div>
-                    ${midCol}
-                    <div class="listing-price-col">
-                        <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
-                        ${item.url ? `<a href="${item.url}" target="_blank" class="btn-view">View Ad ↗</a>` : ''}
+            shortlist.forEach((item, index) => {
+                const linkHtml = item.url !== '#' ? `<a href="${item.url}" target="_blank" style="color: var(--primary); text-decoration: none; font-size: 13px; display:block; margin-top:4px;">↗ Open Link</a>` : '';
+                list.innerHTML += `
+                    <div class="list-item">
+                        <div class="item-title" style="word-break: break-all;">${item.title}</div>
+                        <div class="item-sub">Added: ${item.dateAdded}</div>
+                        ${linkHtml}
+                        <button class="btn-danger" onclick="removeShortlist(${index})">🗑️ Remove</button>
                     </div>
                 `;
-                container.appendChild(div);
             });
-            status.innerText = `Market guide updated (${prices.length} vehicles found).`;
         }
 
-        initDropdowns();
+        // Initialize App on load
+        window.onload = initApp;
     </script>
 </body>
 </html>
