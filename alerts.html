@@ -30,7 +30,8 @@
         .btn-sec { background: #E2E8F0; color: #334155; flex: 0.4; }
         .btn-success { background: #16A34A; color: white; width: 100%; margin-bottom: 8px; }
         .btn-danger-outline { background: #FFF; border: 1px solid #EF4444; color: #EF4444; width: 100%; margin-top: 10px; }
-        
+        .btn-save { background: #F59E0B; color: white; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-decoration: none; border: none; cursor: pointer; flex: 1; }
+
         .active-alert-item { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
         .active-alert-info { font-size: 12px; font-weight: 700; color: #0F172A; }
         .active-alert-sub { font-size: 10px; color: #64748B; margin-top: 2px; }
@@ -67,9 +68,9 @@
         .listing-repaired-col { text-align: center; padding: 0 10px; border-left: 1px solid #F1F5F9; border-right: 1px solid #F1F5F9; margin-right: 10px; }
         .listing-repaired-lbl { font-size: 9px; color: #64748B; font-weight: 700; text-transform: uppercase; }
         .listing-repaired-val { font-size: 13px; font-weight: 800; color: #6B21A8; }
-        .listing-price-col { text-align: right; }
-        .listing-price { font-size: 15px; font-weight: 800; color: #0284C7; margin-bottom: 4px; }
-        .btn-view { background: #0F172A; color: white; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-decoration: none; display: inline-block; }
+        .listing-price-col { text-align: right; display: flex; flex-direction: column; justify-content: center; min-width: 80px;}
+        .listing-price { font-size: 15px; font-weight: 800; color: #0284C7; margin-bottom: 6px; }
+        .btn-view { background: #0F172A; color: white; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-decoration: none; display: inline-block; flex: 1; text-align: center;}
         
         .listing-date-col { text-align: center; padding: 0 10px; border-left: 1px solid #F1F5F9; border-right: 1px solid #F1F5F9; margin-right: 10px; }
         .listing-date-lbl { font-size: 9px; color: #64748B; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
@@ -120,7 +121,7 @@
             <label>DoneDeal Ad URL / Title</label>
             <input type="text" id="shortlistUrl" placeholder="https://www.donedeal.ie/cars-for-sale/...">
         </div>
-        <button class="btn-success" onclick="addToShortlist()">Add to Shortlist</button>
+        <button class="btn-success" onclick="addToShortlistManual()">Add to Shortlist</button>
 
         <hr style="border:0; border-top:1px solid #E2E8F0; margin: 16px 0;">
         <h3 style="margin-top:0; font-size:14px; color:#0F172A;">📌 Your Saved Vehicles</h3>
@@ -240,7 +241,6 @@
         let currentMarketAvg = 0;
         let currentRepairedAvg = 0;
         
-        // Shortlist is now cloud-synced
         let shortlist = [];
 
         const models = {
@@ -375,18 +375,45 @@
             } catch(e) {}
         }
 
-        function addToShortlist() {
+        function saveToShortlistDirect(title, price, year, publishedDate, daysOnMarket, location, adUrl, searchProfile) {
+            if (shortlist.find(item => item.adUrl === adUrl)) {
+                alert('Vehicle is already in your Shortlist!');
+                return;
+            }
+            shortlist.unshift({
+                title: title,
+                price: price,
+                year: year,
+                publishedDate: publishedDate,
+                daysOnMarket: daysOnMarket,
+                location: location,
+                adUrl: adUrl,
+                searchProfile: searchProfile,
+                dateAdded: new Date().toLocaleDateString('en-GB')
+            });
+            saveShortlistToCloud();
+            alert('Added to Shortlist: ' + title);
+            renderShortlist();
+        }
+
+        function addToShortlistManual() {
             const input = document.getElementById('shortlistUrl');
             const val = input.value.trim();
             if (!val) return;
 
             const isUrl = val.startsWith('http');
             const title = isUrl ? 'Saved Ad Link' : val;
-            const url = isUrl ? val : '#';
+            const adUrl = isUrl ? val : '#';
 
             shortlist.unshift({
                 title: title,
-                url: url,
+                price: 0,
+                year: "N/A",
+                publishedDate: "Recent",
+                daysOnMarket: 0,
+                location: "Ireland",
+                adUrl: adUrl,
+                searchProfile: "Manual Web Entry",
                 dateAdded: new Date().toLocaleDateString('en-GB')
             });
 
@@ -410,13 +437,28 @@
             }
 
             shortlist.forEach((item, index) => {
-                const linkHtml = item.url !== '#' ? `<a href="${item.url}" target="_blank" style="color: #0284C7; font-weight: bold; text-decoration: none; font-size: 13px; display:block; margin-top:4px;">↗ Open Link</a>` : '';
+                let pStr = item.price ? `€${Math.round(item.price).toLocaleString()}` : '';
+                let yStr = item.year && item.year !== "N/A" ? `<span class="year-badge">${item.year}</span>` : '';
+                let locStr = item.location ? `<span>📍 ${item.location}</span>` : '';
+                let profStr = item.searchProfile ? `<div class="listing-meta" style="margin-top: 4px;"><span style="color:#0284C7; font-weight:bold;">[${item.searchProfile}]</span></div>` : '';
+                
+                const linkHtml = (item.adUrl && item.adUrl !== '#') ? `<a href="${item.adUrl}" target="_blank" class="btn-view" style="width: 100%; text-align: center; margin-bottom: 6px;">View Ad ↗</a>` : '';
+                
                 list.innerHTML += `
-                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; margin-bottom: 8px;">
-                        <div style="font-size: 13px; font-weight: 700; color: #0F172A; word-break: break-all;">${item.title}</div>
-                        <div style="font-size: 11px; color: #64748B; margin-top: 2px;">Added: ${item.dateAdded}</div>
-                        ${linkHtml}
-                        <button onclick="removeShortlist(${index})" style="background: #FFF; border: 1px solid #EF4444; color: #EF4444; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-top: 8px; width: 100%;">🗑️ Remove</button>
+                    <div class="listing-card" style="margin-bottom: 8px;">
+                        <div class="listing-info">
+                            <div class="listing-title" style="word-break: break-all;">${item.title}</div>
+                            <div class="listing-meta">${yStr} ${locStr}</div>
+                            ${profStr}
+                            <div style="font-size: 10px; color: #94A3B8; margin-top: 4px;">Added: ${item.dateAdded || item.publishedDate}</div>
+                        </div>
+                        <div class="listing-price-col">
+                            <div class="listing-price">${pStr}</div>
+                            <div style="display: flex; flex-direction: column;">
+                                ${linkHtml}
+                                <button onclick="removeShortlist(${index})" style="background: #FFF; border: 1px solid #EF4444; color: #EF4444; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; width: 100%; cursor: pointer;">🗑️ Remove</button>
+                            </div>
+                        </div>
                     </div>
                 `;
             });
@@ -514,7 +556,10 @@
                     </div>
                     <div class="listing-price-col">
                         <div class="listing-price" style="color: #0F172A;">€${Math.round(item.price).toLocaleString()}</div>
-                        <a href="${item.url}" target="_blank" class="btn-view" style="background:#DC2626;">Lowball ↗</a>
+                        <div style="display: flex; gap: 4px;">
+                            <a href="${item.url}" target="_blank" class="btn-view" style="background:#DC2626;">Lowball ↗</a>
+                            <button class="btn-save" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.date}', ${item.dom}, '${item.location}', '${item.url}', 'Hit List (${item.model})')">⭐</button>
+                        </div>
                     </div>
                 `;
                 feed.appendChild(div);
@@ -582,7 +627,10 @@
                         </div>
                         <div class="listing-price-col">
                             <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
-                            <a href="${item.url}" target="_blank" class="btn-view">View Ad ↗</a>
+                            <div style="display: flex; gap: 4px;">
+                                <a href="${item.url}" target="_blank" class="btn-view">View ↗</a>
+                                <button class="btn-save" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.publishedDate || 'Recent'}', ${item.daysOnMarket || 0}, '${item.location}', '${item.url}', 'Alert: ${item.searchProfile}')">⭐</button>
+                            </div>
                         </div>
                     `;
                     feed.appendChild(div);
@@ -798,11 +846,12 @@
 
                     let pubDateStr = "Recent";
                     let domBadgeHtml = "";
+                    let domDays = 0;
                     if (ad.publishDate) {
                         let d = new Date(ad.publishDate);
                         let now = new Date();
                         let diffTime = Math.abs(now - d);
-                        let domDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                        domDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                         
                         let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
                         pubDateStr = `${d.getDate().toString().padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
@@ -817,6 +866,7 @@
                         location: ad.county || 'Ireland', 
                         url: adUrl, 
                         date: pubDateStr,
+                        dom: domDays,
                         domBadge: domBadgeHtml
                     });
                     prices.push(priceNum);
@@ -864,7 +914,10 @@
                     ${midCol}
                     <div class="listing-price-col">
                         <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
-                        ${item.url ? `<a href="${item.url}" target="_blank" class="btn-view">View Ad ↗</a>` : ''}
+                        <div style="display: flex; gap: 4px;">
+                            ${item.url ? `<a href="${item.url}" target="_blank" class="btn-view">View ↗</a>` : ''}
+                            <button class="btn-save" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.date}', ${item.dom}, '${item.location}', '${item.url}', 'Market Guide')">⭐</button>
+                        </div>
                     </div>
                 `;
                 container.appendChild(div);
