@@ -243,25 +243,44 @@
         
         let shortlist = [];
 
-        
-
-        let models = {};
+        // Fallback dictionary in case Cloudflare is unreachable or updating
+        let models = {
+            'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note', 'Leaf', 'Navara'],
+            'Ford': ['Focus', 'Fiesta', 'Mondeo', 'Kuga', 'Galaxy', 'S-Max', 'C-Max', 'Ranger', 'Puma', 'EcoSport', 'Transit Connect', 'Transit'],
+            'Volkswagen': ['Golf', 'Passat', 'Polo', 'Tiguan', 'Caddy', 'Transporter', 'Touran', 'Sharan', 'Scirocco', 'Touareg', 'Arteon', 'ID.3', 'ID.4'],
+            'Peugeot': ['208', '308', '2008', '3008', '5008', '508', 'Partner', 'Expert'],
+            'Hyundai': ['Tucson', 'i10', 'i20', 'i30', 'i40', 'Santa Fe', 'Kona', 'Ioniq'],
+            'Kia': ['Sportage', 'Ceed', 'Sorento', 'Rio', 'Niro', 'EV6', 'Picanto'],
+            'Toyota': ['Corolla', 'Yaris', 'Avensis', 'Auris', 'Prius', 'Land Cruiser', 'RAV4', 'C-HR', 'Hilux'],
+            'Audi': ['A1', 'A3', 'A4', 'A5', 'A6', 'Q3', 'Q5', 'Q7'],
+            'BMW': ['1 Series', '3 Series', '5 Series', 'X1', 'X3', 'X5'],
+            'Skoda': ['Octavia', 'Superb', 'Fabia', 'Kodiaq', 'Karoq', 'Kamiq'],
+            'Renault': ['Clio', 'Megane', 'Captur', 'Kadjar', 'Trafic', 'Master'],
+            'Mercedes-Benz': ['A-Class', 'C-Class', 'E-Class', 'GLC', 'GLE', 'Sprinter', 'Vito'],
+            'Citroen': ['C3', 'C4', 'Berlingo', 'C4 Cactus', 'Dispatch', 'Relay']
+        };
 
         async function initDropdowns() {
             try {
-                // Fetch the master list from Cloudflare
+                // Attempt to fetch fresh taxonomy from Cloudflare
                 const res = await fetch(`${API_URL}/api/models`);
-                models = await res.json();
-            } catch(e) { 
-                console.error("Failed to load models from Cloudflare"); 
-                return;
+                if (res.ok) {
+                    const fetchedModels = await res.json();
+                    if (fetchedModels && Object.keys(fetchedModels).length > 0) {
+                        models = fetchedModels; // Overwrite local fallback with cloud data
+                    }
+                }
+            } catch(e) {
+                console.log("Using local backup models. Cloudflare sync failed.");
             }
             
-            const makes = Object.keys(models);
             const mSel = document.getElementById('makeSelect');
             const aSel = document.getElementById('alertMake');
             
-            makes.forEach(m => {
+            mSel.innerHTML = '';
+            aSel.innerHTML = '';
+            
+            Object.keys(models).forEach(m => {
                 mSel.appendChild(new Option(m, m));
                 aSel.appendChild(new Option(m, m));
             });
@@ -271,22 +290,7 @@
             const aYFrom = document.getElementById('alertYearFrom');
             const aYTo = document.getElementById('alertYearTo');
 
-            for (let y = new Date().getFullYear(); y >= 2006; y--) {
-                yFrom.appendChild(new Option(y, y, false, y === 2018));
-                yTo.appendChild(new Option(y, y, false, y === 2018));
-                aYFrom.appendChild(new Option(y, y, false, y === 2010));
-                aYTo.appendChild(new Option(y, y, false, y === new Date().getFullYear()));
-            }
-            updateModels();
-            updateAlertModels();
-            loadAlertConfig();
-            loadShortlistFromCloud();
-        }
-
-            const yFrom = document.getElementById('yearFromSelect');
-            const yTo = document.getElementById('yearToSelect');
-            const aYFrom = document.getElementById('alertYearFrom');
-            const aYTo = document.getElementById('alertYearTo');
+            yFrom.innerHTML = ''; yTo.innerHTML = ''; aYFrom.innerHTML = ''; aYTo.innerHTML = '';
 
             for (let y = new Date().getFullYear(); y >= 2006; y--) {
                 yFrom.appendChild(new Option(y, y, false, y === 2018));
@@ -294,6 +298,7 @@
                 aYFrom.appendChild(new Option(y, y, false, y === 2010));
                 aYTo.appendChild(new Option(y, y, false, y === new Date().getFullYear()));
             }
+            
             updateModels();
             updateAlertModels();
             loadAlertConfig();
@@ -304,14 +309,18 @@
             const make = document.getElementById('makeSelect').value;
             const modelSel = document.getElementById('modelSelect');
             modelSel.innerHTML = '<option value="Any">Any Model</option>';
-            models[make].forEach(m => modelSel.appendChild(new Option(m, m)));
+            if (models[make]) {
+                models[make].forEach(m => modelSel.appendChild(new Option(m, m)));
+            }
         }
 
         function updateAlertModels() {
             const make = document.getElementById('alertMake').value;
             const modelSel = document.getElementById('alertModel');
             modelSel.innerHTML = '<option value="Any">Any Model</option>';
-            models[make].forEach(m => modelSel.appendChild(new Option(m, m)));
+            if (models[make]) {
+                models[make].forEach(m => modelSel.appendChild(new Option(m, m)));
+            }
         }
 
         function switchMode(section) {
