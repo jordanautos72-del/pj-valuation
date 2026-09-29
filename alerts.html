@@ -243,7 +243,6 @@
         
         let shortlist = [];
 
-        // Fallback dictionary in case Cloudflare is unreachable or updating
         let models = {
             'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note', 'Leaf', 'Navara'],
             'Ford': ['Focus', 'Fiesta', 'Mondeo', 'Kuga', 'Galaxy', 'S-Max', 'C-Max', 'Ranger', 'Puma', 'EcoSport', 'Transit Connect', 'Transit'],
@@ -262,17 +261,14 @@
 
         async function initDropdowns() {
             try {
-                // Attempt to fetch fresh taxonomy from Cloudflare
                 const res = await fetch(`${API_URL}/api/models`);
                 if (res.ok) {
                     const fetchedModels = await res.json();
                     if (fetchedModels && Object.keys(fetchedModels).length > 0) {
-                        models = fetchedModels; // Overwrite local fallback with cloud data
+                        models = fetchedModels;
                     }
                 }
-            } catch(e) {
-                console.log("Using local backup models. Cloudflare sync failed.");
-            }
+            } catch(e) {}
             
             const mSel = document.getElementById('makeSelect');
             const aSel = document.getElementById('alertMake');
@@ -382,17 +378,12 @@
             }
         }
 
-        // ==========================================
-        // ⭐ SHORTLIST LOGIC (CLOUD SYNCED)
-        // ==========================================
         async function loadShortlistFromCloud() {
             try {
                 const res = await fetch(`${API_URL}/api/shortlist`);
                 shortlist = await res.json();
                 renderShortlist();
-            } catch(e) {
-                shortlist = [];
-            }
+            } catch(e) { shortlist = []; }
         }
 
         async function saveShortlistToCloud() {
@@ -411,15 +402,9 @@
                 return;
             }
             shortlist.unshift({
-                title: title,
-                price: price,
-                year: year,
-                publishedDate: publishedDate,
-                daysOnMarket: daysOnMarket,
-                location: location,
-                adUrl: adUrl,
-                searchProfile: searchProfile,
-                dateAdded: new Date().toLocaleDateString('en-GB')
+                title: title, price: price, year: year, publishedDate: publishedDate,
+                daysOnMarket: daysOnMarket, location: location, adUrl: adUrl,
+                searchProfile: searchProfile, dateAdded: new Date().toLocaleDateString('en-GB')
             });
             saveShortlistToCloud();
             alert('Added to Shortlist: ' + title);
@@ -430,23 +415,13 @@
             const input = document.getElementById('shortlistUrl');
             const val = input.value.trim();
             if (!val) return;
-
             const isUrl = val.startsWith('http');
-            const title = isUrl ? 'Saved Ad Link' : val;
-            const adUrl = isUrl ? val : '#';
-
             shortlist.unshift({
-                title: title,
-                price: 0,
-                year: "N/A",
-                publishedDate: "Recent",
-                daysOnMarket: 0,
-                location: "Ireland",
-                adUrl: adUrl,
-                searchProfile: "Manual Web Entry",
+                title: isUrl ? 'Saved Ad Link' : val, price: 0, year: "N/A",
+                publishedDate: "Recent", daysOnMarket: 0, location: "Ireland",
+                adUrl: isUrl ? val : '#', searchProfile: "Manual Web Entry",
                 dateAdded: new Date().toLocaleDateString('en-GB')
             });
-
             saveShortlistToCloud();
             input.value = '';
             renderShortlist();
@@ -465,13 +440,11 @@
                 list.innerHTML = `<div style="font-size: 13px; color: #64748B;">Your shortlist is empty.</div>`;
                 return;
             }
-
             shortlist.forEach((item, index) => {
                 let pStr = item.price ? `€${Math.round(item.price).toLocaleString()}` : '';
                 let yStr = item.year && item.year !== "N/A" ? `<span class="year-badge">${item.year}</span>` : '';
                 let locStr = item.location ? `<span>📍 ${item.location}</span>` : '';
                 let profStr = item.searchProfile ? `<div class="listing-meta" style="margin-top: 4px;"><span style="color:#0284C7; font-weight:bold;">[${item.searchProfile}]</span></div>` : '';
-                
                 const linkHtml = (item.adUrl && item.adUrl !== '#') ? `<a href="${item.adUrl}" target="_blank" class="btn-view" style="width: 100%; text-align: center; margin-bottom: 6px;">View Ad ↗</a>` : '';
                 
                 list.innerHTML += `
@@ -494,9 +467,6 @@
             });
         }
 
-        // ==========================================
-        // 🎯 STAGNANT HIT LIST LOGIC
-        // ==========================================
         async function loadHitList(category) {
             document.getElementById('btnHitSalvage').className = category === 'damagedcars' ? 'btn-primary' : 'btn-sec';
             document.getElementById('btnHitStandard').className = category === 'cars' ? 'btn-primary' : 'btn-sec';
@@ -506,58 +476,31 @@
 
             const targets = savedAlerts.filter(a => a.section === category);
             if (targets.length === 0) {
-                feed.innerHTML = `<div style="font-size:12px; color:#64748B; font-style:italic;">No active scanners found for ${category === 'cars' ? 'Standard' : 'Salvage'}. Add scanners in the Alerts tab to pull their hit lists.</div>`;
+                feed.innerHTML = `<div style="font-size:12px; color:#64748B; font-style:italic;">No active scanners found for this category. Add scanners in Alerts tab.</div>`;
                 return;
             }
 
             let stagnantListings = [];
-
             for (let config of targets) {
                 try {
-                    let searchWord = (config.model === "Any" || config.model === "") ? config.make : config.model;
-                    const url = `${API_URL}/?section=${category}&make=${encodeURIComponent(config.make)}&model=${encodeURIComponent(searchWord)}&year_from=${config.yearFrom}&year_to=${config.yearTo}&sort=publishdate+asc`;
-                    const res = await fetch(url);
+                    const payload = {
+                        make: config.make, model: config.model, section: category,
+                        yearFrom: parseInt(config.yearFrom), yearTo: parseInt(config.yearTo),
+                        minPrice: parseFloat(config.minPrice) || 0, maxPrice: parseFloat(config.price) || 999999,
+                        minDom: 45
+                    };
+                    const res = await fetch(`${API_URL}/api/search`, {
+                        method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' }
+                    });
                     const data = await res.json();
-                    
-                    if (data && data.ads) {
-                        data.ads.forEach(ad => {
-                            let priceNum = parseFloat((ad.price||"").replace(/[^0-9.]/g, '')) || 0;
-                            if (priceNum >= config.minPrice && priceNum <= config.price) {
-                                if (ad.publishDate) {
-                                    let d = new Date(ad.publishDate);
-                                    let now = new Date();
-                                    let domDays = Math.floor(Math.abs(now - d) / (1000 * 60 * 60 * 24));
-                                    
-                                    if (domDays >= 45) { 
-                                        let adUrl = ad.friendlyUrl ? (ad.friendlyUrl.startsWith('http') ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`) : `https://www.donedeal.ie/${category}-for-sale/view/${ad.id}`;
-                                        
-                                        let adYear = ad.year || "N/A";
-                                        if (adYear === "N/A") {
-                                            const yearMatch = (ad.header || "").match(/\b(20[0-2][0-9])\b/);
-                                            if (yearMatch) adYear = yearMatch[1];
-                                        }
-
-                                        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                                        let pubDateStr = `${d.getDate().toString().padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
-
-                                        if (!stagnantListings.find(l => l.url === adUrl)) {
-                                            stagnantListings.push({
-                                                title: ad.header,
-                                                year: adYear,
-                                                price: priceNum,
-                                                location: ad.county || 'Ireland',
-                                                url: adUrl,
-                                                date: pubDateStr,
-                                                dom: domDays,
-                                                model: config.model
-                                            });
-                                        }
-                                    }
-                                }
+                    if (data && data.listings) {
+                        data.listings.forEach(ad => {
+                            if (!stagnantListings.find(l => l.adUrl === ad.adUrl)) {
+                                stagnantListings.push(ad);
                             }
                         });
                     }
-                } catch(e) { console.log(e); }
+                } catch(e) {}
             }
 
             if (stagnantListings.length === 0) {
@@ -565,8 +508,7 @@
                 return;
             }
 
-            stagnantListings.sort((a, b) => b.dom - a.dom);
-
+            stagnantListings.sort((a, b) => b.daysOnMarket - a.daysOnMarket);
             feed.innerHTML = '';
             stagnantListings.forEach(item => {
                 const div = document.createElement('div');
@@ -574,21 +516,17 @@
                 div.innerHTML = `
                     <div class="listing-info">
                         <div class="listing-title">${item.title}</div>
-                        <div class="listing-meta">
-                            <span class="year-badge">${item.year}</span>
-                            <span>📍 ${item.location}</span>
-                        </div>
+                        <div class="listing-meta"><span class="year-badge">${item.year}</span><span>📍 ${item.location}</span></div>
                     </div>
                     <div class="listing-date-col" style="background-color: #FEF2F2; padding: 4px 8px; border-radius: 6px; border: 1px solid #FECACA;">
                         <div class="listing-date-lbl" style="color: #DC2626;">Stagnant</div>
-                        <div class="listing-date-val" style="color: #DC2626; font-size:13px;">⏳ ${item.dom} Days</div>
-                        <div style="font-size: 8px; color: #7F1D1D; margin-top:2px;">Since ${item.date}</div>
+                        <div class="listing-date-val" style="color: #DC2626; font-size:13px;">⏳ ${item.daysOnMarket} Days</div>
                     </div>
                     <div class="listing-price-col">
                         <div class="listing-price" style="color: #0F172A;">€${Math.round(item.price).toLocaleString()}</div>
                         <div style="display: flex; gap: 4px;">
-                            <a href="${item.url}" target="_blank" class="btn-view" style="background:#DC2626;">Lowball ↗</a>
-                            <button class="btn-save" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.date}', ${item.dom}, '${item.location}', '${item.url}', 'Hit List (${item.model})')">⭐</button>
+                            <a href="${item.adUrl}" target="_blank" class="btn-view" style="background:#DC2626;">Lowball ↗</a>
+                            <button class="btn-save" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.publishedDate}', ${item.daysOnMarket}, '${item.location}', '${item.adUrl}', 'Hit List')">⭐</button>
                         </div>
                     </div>
                 `;
@@ -596,10 +534,6 @@
             });
         }
 
-
-        // ==========================================
-        // STANDARD ALERTS & MARKET LOGIC
-        // ==========================================
         async function clearAlertCache() {
             const feedback = document.getElementById('cacheFeedback');
             feedback.innerText = "Clearing sent-ad history...";
@@ -607,217 +541,49 @@
                 const res = await fetch(`${API_URL}/api/clear-cache`);
                 const data = await res.json();
                 if (data.success) {
-                    feedback.innerText = "Cache cleared! Re-scanning...";
+                    feedback.innerText = "Cache cleared!";
                     setTimeout(() => feedback.innerText = '', 3000);
                     triggerInstantScan();
-                } else {
-                    feedback.innerText = "Failed to clear cache.";
                 }
-            } catch(e) {
-                feedback.innerText = "Error clearing cache.";
-            }
+            } catch(e) { feedback.innerText = "Error clearing cache."; }
         }
 
         async function triggerInstantScan() {
             const feed = document.getElementById('matchedListingsFeed');
             feed.innerHTML = '<div style="font-size:12px; color:#0284C7; font-style:italic;">Scanning active profiles...</div>';
-            
             try {
                 const res = await fetch(`${API_URL}/api/scan-alerts`);
                 const data = await res.json();
-                
                 if (!data.matches || data.matches.length === 0) {
                     feed.innerHTML = '<div style="font-size:12px; color:#64748B; font-style:italic;">No active listings currently match your criteria.</div>';
                     return;
                 }
-
                 feed.innerHTML = '';
                 data.matches.forEach(item => {
-                    const domBadge = item.daysOnMarket !== undefined 
-                        ? `<div style="font-size:9px; color:#4b5563; background:#f3f4f6; padding:2px 4px; border-radius:4px; margin-top:4px; display:inline-block; font-weight:bold;">⏳ ${item.daysOnMarket} Days</div>` 
-                        : '';
-                        
                     const div = document.createElement('div');
                     div.className = 'listing-card';
                     div.innerHTML = `
                         <div class="listing-info">
                             <div class="listing-title">${item.title}</div>
-                            <div class="listing-meta">
-                                <span class="year-badge">${item.year}</span>
-                                <span>📍 ${item.location}</span>
-                            </div>
-                            <div class="listing-meta" style="margin-top: 4px;">
-                                <span style="color:#0284C7; font-weight:bold;">[${item.searchProfile}]</span>
-                            </div>
+                            <div class="listing-meta"><span class="year-badge">${item.year}</span><span>📍 ${item.location}</span></div>
+                            <div class="listing-meta" style="margin-top: 4px;"><span style="color:#0284C7; font-weight:bold;">[${item.searchProfile}]</span></div>
                         </div>
                         <div class="listing-date-col">
                             <div class="listing-date-lbl">Posted</div>
                             <div class="listing-date-val">${item.publishedDate || 'Recent'}</div>
-                            ${domBadge}
+                            <div style="font-size:9px; color:#4b5563; background:#f3f4f6; padding:2px 4px; border-radius:4px; margin-top:4px; font-weight:bold;">⏳ ${item.daysOnMarket} Days</div>
                         </div>
                         <div class="listing-price-col">
                             <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
                             <div style="display: flex; gap: 4px;">
-                                <a href="${item.url}" target="_blank" class="btn-view">View ↗</a>
-                                <button class="btn-save" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.publishedDate || 'Recent'}', ${item.daysOnMarket || 0}, '${item.location}', '${item.url}', 'Alert: ${item.searchProfile}')">⭐</button>
+                                <a href="${item.adUrl}" target="_blank" class="btn-view">View ↗</a>
+                                <button class="btn-save" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.publishedDate}', ${item.daysOnMarket}, '${item.location}', '${item.adUrl}', 'Alert')">⭐</button>
                             </div>
                         </div>
                     `;
                     feed.appendChild(div);
                 });
-            } catch(e) {
-                feed.innerHTML = '<div style="font-size:12px; color:#DC2626; font-style:italic;">Failed to run instant scan.</div>';
-            }
-        }
-
-        function calculateTradeMargin() {
-            const repairs = parseFloat(document.getElementById('calcRepairCost').value) || 0;
-            const profit = parseFloat(document.getElementById('calcTargetProfit').value) || 0;
-            
-            let baseValue = currentSection === 'damagedcars' ? currentRepairedAvg : currentMarketAvg;
-            
-            if (baseValue <= 0) {
-                document.getElementById('calcMaxBuyIn').innerText = '€0 (Run Check Market first)';
-                return;
-            }
-
-            const maxBuyIn = baseValue - repairs - profit;
-            document.getElementById('calcMaxBuyIn').innerText = maxBuyIn > 0 ? '€' + Math.round(maxBuyIn).toLocaleString() : '€0 (Too tight)';
-        }
-
-        async function loadAlertConfig() {
-            try {
-                const res = await fetch(`${API_URL}/api/config`);
-                const data = await res.json();
-                savedAlerts = Array.isArray(data) ? data : [];
-                renderActiveAlerts();
-            } catch(e) { savedAlerts = []; }
-        }
-
-        function renderActiveAlerts() {
-            const container = document.getElementById('activeAlertsList');
-            if (savedAlerts.length === 0) {
-                container.innerHTML = '<div style="font-size:12px; color:#64748B; font-style:italic;">No active background scanners configured.</div>';
-                return;
-            }
-
-            container.innerHTML = '';
-            savedAlerts.forEach((alert, index) => {
-                const typeText = alert.section === 'cars' ? 'Standard' : 'Salvage';
-                const minP = alert.minPrice ? `Min: €${alert.minPrice} | ` : '';
-                const domTxt = alert.minDom > 0 ? `DOM: ${alert.minDom}+ | ` : '';
-                const div = document.createElement('div');
-                div.className = 'active-alert-item';
-                div.innerHTML = `
-                    <div>
-                        <div class="active-alert-info">${alert.make} ${alert.model} (${typeText})</div>
-                        <div class="active-alert-sub">Years: ${alert.yearFrom}-${alert.yearTo} | ${domTxt}${minP}Max: €${alert.price}</div>
-                    </div>
-                    <div class="alert-actions">
-                        <button class="btn-edit-alert" onclick="editAlert(${index})">Edit</button>
-                        <button class="btn-delete-alert" onclick="deleteAlert(${index})">Remove</button>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        function editAlert(index) {
-            const alert = savedAlerts[index];
-            editingIndex = index;
-
-            document.getElementById('alertSection').value = alert.section;
-            document.getElementById('alertMake').value = alert.make;
-            updateAlertModels();
-            document.getElementById('alertModel').value = alert.model;
-            document.getElementById('alertYearFrom').value = alert.yearFrom;
-            document.getElementById('alertYearTo').value = alert.yearTo;
-            document.getElementById('alertMinPrice').value = alert.minPrice || 500;
-            document.getElementById('alertPrice').value = alert.price;
-            document.getElementById('alertMinDom').value = alert.minDom || 0;
-
-            document.getElementById('formTitle').innerText = 'Edit Active Alert';
-            document.getElementById('saveAlertBtn').innerText = '💾 Update Alert';
-            
-            if (!document.getElementById('cancelEditBtn')) {
-                const btnRow = document.getElementById('formBtnRow');
-                const cancelBtn = document.createElement('button');
-                cancelBtn.id = 'cancelEditBtn';
-                cancelBtn.className = 'btn-sec';
-                cancelBtn.style.flex = '0.5';
-                cancelBtn.innerText = 'Cancel';
-                cancelBtn.onclick = resetAlertForm;
-                btnRow.appendChild(cancelBtn);
-            }
-
-            window.scrollTo({ top: document.getElementById('formTitle').offsetTop - 20, behavior: 'smooth' });
-        }
-
-        function resetAlertForm() {
-            editingIndex = null;
-            document.getElementById('formTitle').innerText = 'Add New Alert';
-            document.getElementById('saveAlertBtn').innerText = '＋ Add Alert to Scanners';
-            const cancelBtn = document.getElementById('cancelEditBtn');
-            if (cancelBtn) cancelBtn.remove();
-        }
-
-        async function saveAlert() {
-            const feedback = document.getElementById('alertFeedback');
-            feedback.innerText = editingIndex !== null ? "Updating alert..." : "Adding alert...";
-
-            const alertData = {
-                active: true,
-                section: document.getElementById('alertSection').value,
-                make: document.getElementById('alertMake').value,
-                model: document.getElementById('alertModel').value,
-                yearFrom: document.getElementById('alertYearFrom').value,
-                yearTo: document.getElementById('alertYearTo').value,
-                minPrice: document.getElementById('alertMinPrice').value,
-                price: document.getElementById('alertPrice').value,
-                minDom: document.getElementById('alertMinDom').value
-            };
-
-            if (editingIndex !== null) {
-                savedAlerts[editingIndex] = alertData;
-            } else {
-                savedAlerts.push(alertData);
-            }
-
-            try {
-                await fetch(`${API_URL}/api/config`, {
-                    method: 'POST',
-                    body: JSON.stringify(savedAlerts)
-                });
-                feedback.innerText = editingIndex !== null ? "Alert updated successfully!" : "Scanner added successfully!";
-                setTimeout(() => feedback.innerText = '', 3000);
-                resetAlertForm();
-                renderActiveAlerts();
-                triggerInstantScan();
-            } catch(e) {
-                feedback.innerText = "Error saving alert.";
-            }
-        }
-
-        async function deleteAlert(index) {
-            if (editingIndex === index) {
-                resetAlertForm();
-            }
-            savedAlerts.splice(index, 1);
-            try {
-                await fetch(`${API_URL}/api/config`, {
-                    method: 'POST',
-                    body: JSON.stringify(savedAlerts)
-                });
-                renderActiveAlerts();
-                triggerInstantScan();
-            } catch(e) {
-                alert("Error removing alert.");
-            }
-        }
-
-        function getPercentile(arr, p) {
-            if (arr.length === 0) return 0;
-            return arr[Math.min(Math.floor((p / 100) * arr.length), arr.length - 1)];
+            } catch(e) { feed.innerHTML = '<div style="font-size:12px; color:#DC2626; font-style:italic;">Failed to run instant scan.</div>'; }
         }
 
         async function lookupVehicle(forceFresh) {
@@ -826,98 +592,52 @@
             const yearFrom = document.getElementById('yearFromSelect').value;
             const yearTo = document.getElementById('yearToSelect').value;
             const status = document.getElementById('statusBar');
-            status.innerText = `Querying live DoneDeal market...`;
+            status.innerText = `Querying live DoneDeal market via Cloudflare edge...`;
 
             let searchWord = (model === "Any" || model === "") ? make : model;
+            const payload = {
+                make: make, model: searchWord, section: currentSection,
+                yearFrom: parseInt(yearFrom), yearTo: parseInt(yearTo),
+                minPrice: currentSection === 'damagedcars' ? 150 : 400, maxPrice: 999999, minDom: 0
+            };
 
-            const primaryUrl = `${API_URL}/?section=${currentSection}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(searchWord)}&year_from=${yearFrom}&year_to=${yearTo}`;
-            const fetchPromises = [ fetch(primaryUrl).then(r => r.ok ? r.json() : null).catch(()=>null) ];
-            
-            let stdIndex = -1, stdAvg = 0;
+            let stdAvg = 0;
+            const fetchPromises = [
+                fetch(`${API_URL}/api/search`, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } }).then(r => r.ok ? r.json() : null).catch(()=>null)
+            ];
+
             if (currentSection === 'damagedcars') {
-                const stdUrl = `${API_URL}/?section=cars&make=${encodeURIComponent(make)}&model=${encodeURIComponent(searchWord)}&year_from=${yearFrom}&year_to=${yearTo}`;
-                stdIndex = fetchPromises.length;
-                fetchPromises.push(fetch(stdUrl).then(r => r.ok ? r.json() : null).catch(()=>null));
+                const stdPayload = { ...payload, section: 'cars', minPrice: 400 };
+                fetchPromises.push(
+                    fetch(`${API_URL}/api/search`, { method: 'POST', body: JSON.stringify(stdPayload), headers: { 'Content-Type': 'application/json' } }).then(r => r.ok ? r.json() : null).catch(()=>null)
+                );
             }
 
             const results = await Promise.all(fetchPromises);
-            const data = results[0];
+            const mainResult = results[0];
 
-            if (stdIndex !== -1 && results[stdIndex] && results[stdIndex].ads) {
-                let stdPrices = [];
-                results[stdIndex].ads.forEach(ad => {
-                    let p = parseFloat((ad.price||"").replace(/[^0-9.]/g, ''))||0;
-                    if (p >= 400) stdPrices.push(p);
-                });
-                if (stdPrices.length > 0) {
-                    stdPrices.sort((a,b) => a - b);
-                    stdAvg = getPercentile(stdPrices, 50);
-                }
+            if (results[1] && results[1].stats) {
+                stdAvg = results[1].stats.avg;
             }
 
-            if (!data || !data.ads || data.ads.length === 0) {
-                status.innerText = `No listings returned via worker bridge.`;
+            if (!mainResult || !mainResult.listings || mainResult.listings.length === 0) {
+                status.innerText = `No listings returned from edge worker.`;
                 return;
             }
 
-            let listings = [];
-            let prices = [];
-            const minP = currentSection === 'damagedcars' ? 150 : 400;
+            const stats = mainResult.stats || { low: 0, avg: 0, high: 0 };
+            const listings = mainResult.listings;
 
-            data.ads.forEach(ad => {
-                let priceNum = parseFloat((ad.price||"").replace(/[^0-9.]/g, '')) || 0;
-                if (priceNum >= minP) {
-                    let adUrl = ad.friendlyUrl ? (ad.friendlyUrl.startsWith('http') ? ad.friendlyUrl : `https://www.donedeal.ie${ad.friendlyUrl}`) : `https://www.donedeal.ie/${currentSection}-for-sale/view/${ad.id}`;
-                    let adYear = ad.year || yearFrom;
-                    if (!ad.year) {
-                        const yearMatch = (ad.header || "").match(/\b(20[0-2][0-9])\b/);
-                        if (yearMatch) adYear = yearMatch[1];
-                    }
-
-                    let pubDateStr = "Recent";
-                    let domBadgeHtml = "";
-                    let domDays = 0;
-                    if (ad.publishDate) {
-                        let d = new Date(ad.publishDate);
-                        let now = new Date();
-                        let diffTime = Math.abs(now - d);
-                        domDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                        
-                        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                        pubDateStr = `${d.getDate().toString().padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
-                        
-                        domBadgeHtml = `<div style="font-size:9px; color:#4b5563; background:#f3f4f6; padding:2px 4px; border-radius:4px; margin-top:4px; display:inline-block; font-weight:bold;">⏳ ${domDays} Days</div>`;
-                    }
-
-                    listings.push({ 
-                        title: ad.header, 
-                        year: adYear, 
-                        price: priceNum, 
-                        location: ad.county || 'Ireland', 
-                        url: adUrl, 
-                        date: pubDateStr,
-                        dom: domDays,
-                        domBadge: domBadgeHtml
-                    });
-                    prices.push(priceNum);
-                }
-            });
-
-            if (prices.length === 0) { status.innerText = 'No realistic asking prices found.'; return; }
-            prices.sort((a, b) => a - b);
-            
-            const marketAvgVal = getPercentile(prices, 50);
-            
             if (currentSection === 'cars') {
-                currentMarketAvg = marketAvgVal;
+                currentMarketAvg = stats.avg;
             } else if (currentSection === 'damagedcars') {
                 currentRepairedAvg = stdAvg;
             }
             calculateTradeMargin();
 
-            document.getElementById('statHigh').innerText = '€' + Math.round(getPercentile(prices, 85)).toLocaleString();
-            document.getElementById('statAvg').innerText = '€' + Math.round(marketAvgVal).toLocaleString();
-            document.getElementById('statLow').innerText = '€' + Math.round(getPercentile(prices, 15)).toLocaleString();
+            document.getElementById('statHigh').innerText = '€' + Math.round(stats.high).toLocaleString();
+            document.getElementById('statAvg').innerText = '€' + Math.round(stats.avg).toLocaleString();
+            document.getElementById('statLow').innerText = '€' + Math.round(stats.low).toLocaleString();
             if (currentSection === 'damagedcars') document.getElementById('statRepaired').innerText = stdAvg > 0 ? '€' + Math.round(stdAvg).toLocaleString() : 'N/A';
 
             const container = document.getElementById('listingsList');
@@ -931,28 +651,45 @@
                 div.innerHTML = `
                     <div class="listing-info">
                         <div class="listing-title">${item.title}</div>
-                        <div class="listing-meta">
-                            <span class="year-badge">${item.year}</span>
-                            <span>📍 ${item.location}</span>
-                        </div>
+                        <div class="listing-meta"><span class="year-badge">${item.year}</span><span>📍 ${item.location}</span></div>
                     </div>
                     <div class="listing-date-col">
                         <div class="listing-date-lbl">Posted</div>
-                        <div class="listing-date-val">${item.date}</div>
-                        ${item.domBadge}
+                        <div class="listing-date-val">${item.publishedDate}</div>
+                        <div style="font-size:9px; color:#4b5563; background:#f3f4f6; padding:2px 4px; border-radius:4px; margin-top:4px; font-weight:bold;">⏳ ${item.daysOnMarket} Days</div>
                     </div>
                     ${midCol}
                     <div class="listing-price-col">
                         <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
                         <div style="display: flex; gap: 4px;">
-                            ${item.url ? `<a href="${item.url}" target="_blank" class="btn-view">View ↗</a>` : ''}
-                            <button class="btn-save" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.date}', ${item.dom}, '${item.location}', '${item.url}', 'Market Guide')">⭐</button>
+                            ${item.adUrl ? `<a href="${item.adUrl}" target="_blank" class="btn-view">View ↗</a>` : ''}
+                            <button class="btn-save" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.publishedDate}', ${item.daysOnMarket}, '${item.location}', '${item.adUrl}', 'Market Guide')">⭐</button>
                         </div>
                     </div>
                 `;
                 container.appendChild(div);
             });
-            status.innerText = `Market guide updated (${prices.length} vehicles found).`;
+            status.innerText = `Market guide updated via Cloudflare edge (${listings.length} vehicles found).`;
+        }
+
+        function calculateTradeMargin() {
+            const repairs = parseFloat(document.getElementById('calcRepairCost').value) || 0;
+            const profit = parseFloat(document.getElementById('calcTargetProfit').value) || 0;
+            let baseValue = currentSection === 'damagedcars' ? currentRepairedAvg : currentMarketAvg;
+            if (baseValue <= 0) {
+                document.getElementById('calcMaxBuyIn').innerText = '€0 (Run Check Market first)';
+                return;
+            }
+            const maxBuyIn = baseValue - repairs - profit;
+            document.getElementById('calcMaxBuyIn').innerText = maxBuyIn > 0 ? '€' + Math.round(maxBuyIn).toLocaleString() : '€0 (Too tight)';
+        }
+
+        async function loadAlertConfig() {
+            try {
+                const res = await fetch(`${API_URL}/api/config`);
+                const data = await res.json();
+                savedAlerts = Array.isArray(data) ? data : [];
+            } catch(e) { savedAlerts = []; }
         }
 
         initDropdowns();
