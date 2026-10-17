@@ -90,6 +90,7 @@
         <button class="nav-tab" id="tabAlerts" onclick="switchMode('alerts')">Alerts</button>
         <button class="nav-tab" id="tabHitList" onclick="switchMode('hitlist')">🎯 Hit List</button>
         <button class="nav-tab" id="tabShortlist" onclick="switchMode('shortlist')">⭐ Shortlist</button>
+        <button class="nav-tab" id="tabReceipts" onclick="switchMode('receipts')">🧾 Receipts</button>
     </div>
 
     <!-- MAIN SEARCH CARD -->
@@ -141,6 +142,20 @@
         <div id="hitListFeed">
             <div style="font-size: 12px; color: #64748B; font-style: italic;">Select a category above to scan your targets...</div>
         </div>
+    </div>
+
+    <!-- RECEIPT UPLOAD CARD -->
+    <div class="card" id="receiptsCard" style="display: none;">
+        <h3 style="margin-top:0; font-size:14px; color:#0F172A;">📸 Snap & Upload Receipt</h3>
+        <div style="font-size: 11px; color: #64748B; margin-bottom: 16px;">Capture a photo of a physical receipt to sync it directly to your laptop's Drive inbox.</div>
+
+        <input type="file" accept="image/*" capture="environment" id="receiptCamera" style="display:none" onchange="previewReceipt(event)">
+        <button class="btn-sec" onclick="document.getElementById('receiptCamera').click()" style="width: 100%; margin-bottom: 14px; height: 54px; border: 1px solid #CBD5E1;">📷 Open Camera</button>
+
+        <img id="receiptPreview" style="width: 100%; border-radius: 8px; margin-bottom: 14px; display: none; border: 1px solid #CBD5E1;">
+
+        <button class="btn-success" id="btnUploadReceipt" style="display:none; height: 54px;" onclick="uploadReceipt()">☁️ Upload to Laptop Inbox</button>
+        <div id="receiptFeedback" style="font-size: 12px; font-weight: bold; margin-top: 10px; text-align: center;"></div>
     </div>
 
     <!-- AUTO ALERTS CARD -->
@@ -240,8 +255,8 @@
         let editingIndex = null;
         let currentMarketAvg = 0;
         let currentRepairedAvg = 0;
-        
         let shortlist = [];
+        let currentReceiptFile = null;
 
         let models = {
             'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note', 'Leaf', 'Navara'],
@@ -325,6 +340,7 @@
             document.getElementById('tabHitList').className = section === 'hitlist' ? 'nav-tab active' : 'nav-tab';
             document.getElementById('tabAlerts').className = section === 'alerts' ? 'nav-tab active' : 'nav-tab';
             document.getElementById('tabShortlist').className = section === 'shortlist' ? 'nav-tab active' : 'nav-tab';
+            document.getElementById('tabReceipts').className = section === 'receipts' ? 'nav-tab active' : 'nav-tab';
 
             document.getElementById('searchCard').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
             document.getElementById('kpiDashboard').style.display = (section === 'cars' || section === 'damagedcars') ? 'flex' : 'none';
@@ -334,6 +350,7 @@
             document.getElementById('alertsCard').style.display = section === 'alerts' ? 'block' : 'none';
             document.getElementById('hitListCard').style.display = section === 'hitlist' ? 'block' : 'none';
             document.getElementById('shortlistCard').style.display = section === 'shortlist' ? 'block' : 'none';
+            document.getElementById('receiptsCard').style.display = section === 'receipts' ? 'block' : 'none';
 
             if (section === 'alerts') {
                 document.getElementById('modeTitle').innerText = 'Multi-Alert Scanners';
@@ -344,6 +361,8 @@
             } else if (section === 'shortlist') {
                 document.getElementById('modeTitle').innerText = '⭐ Saved Shortlist';
                 loadShortlistFromCloud();
+            } else if (section === 'receipts') {
+                document.getElementById('modeTitle').innerText = '🧾 Receipt Scanner';
             } else {
                 currentSection = section;
                 document.getElementById('modeTitle').innerText = section === 'cars' ? 'Standard Valuation' : 'Damaged / Salvage';
@@ -377,6 +396,63 @@
                 calculateTradeMargin();
             }
         }
+
+        // --- RECEIPT SCANNER LOGIC ---
+        function previewReceipt(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            currentReceiptFile = file;
+            
+            const preview = document.getElementById('receiptPreview');
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+            
+            document.getElementById('btnUploadReceipt').style.display = 'block';
+            document.getElementById('receiptFeedback').innerText = '';
+        }
+
+        async function uploadReceipt() {
+            if (!currentReceiptFile) return;
+            const btn = document.getElementById('btnUploadReceipt');
+            const feedback = document.getElementById('receiptFeedback');
+
+            btn.disabled = true;
+            btn.innerText = 'Uploading...';
+            feedback.style.color = '#0284C7';
+            feedback.innerText = 'Sending to Google Drive Inbox...';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', currentReceiptFile);
+
+                // This pushes the image to your existing Cloudflare Worker to pass to Drive
+                const res = await fetch(`${API_URL}/api/upload-receipt`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (res.ok) {
+                    feedback.style.color = '#16A34A';
+                    feedback.innerText = '✅ Receipt successfully uploaded to laptop inbox!';
+                    setTimeout(() => {
+                        document.getElementById('receiptPreview').style.display = 'none';
+                        btn.style.display = 'none';
+                        feedback.innerText = '';
+                    }, 4000);
+                } else {
+                    throw new Error('Upload failed');
+                }
+            } catch (err) {
+                feedback.style.color = '#EF4444';
+                feedback.innerText = '❌ Error uploading receipt. Please try again.';
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '☁️ Upload to Laptop Inbox';
+                currentReceiptFile = null;
+                document.getElementById('receiptCamera').value = '';
+            }
+        }
+        // -----------------------------
 
         async function loadShortlistFromCloud() {
             try {
