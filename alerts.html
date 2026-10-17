@@ -80,7 +80,7 @@
 <body>
 
     <div class="header">
-        <h1>PJ MARKET VALUATION</h1>
+        <h1>PJ MARKET VALUATION <span style="font-size:10px; color:#94A3B8;">v2.1</span></h1>
         <span id="modeTitle">Standard Valuation</span>
     </div>
 
@@ -146,7 +146,7 @@
 
     <!-- RECEIPT UPLOAD CARD -->
     <div class="card" id="receiptsCard" style="display: none;">
-        <h3 style="margin-top:0; font-size:14px; color:#0F172A;">📸 Snap & Upload Receipt</h3>
+        <h3 style="margin-top:0; font-size:14px; color:#0F172A;">📸 Snap & Upload Receipt (v2.1)</h3>
         <div style="font-size: 11px; color: #64748B; margin-bottom: 16px;">Capture a photo of a physical receipt to sync it directly to your laptop's Drive inbox.</div>
 
         <input type="file" accept="image/*" capture="environment" id="receiptCamera" style="display:none" onchange="previewReceipt(event)">
@@ -155,7 +155,7 @@
         <img id="receiptPreview" style="width: 100%; border-radius: 8px; margin-bottom: 14px; display: none; border: 1px solid #CBD5E1;">
 
         <button class="btn-success" id="btnUploadReceipt" style="display:none; height: 54px;" onclick="uploadReceipt()">☁️ Upload to Laptop Inbox</button>
-        <div id="receiptFeedback" style="font-size: 12px; font-weight: bold; margin-top: 10px; text-align: center;"></div>
+        <div id="receiptFeedback" style="font-size: 12px; font-weight: bold; margin-top: 10px; text-align: center; word-break: break-word;"></div>
     </div>
 
     <!-- AUTO ALERTS CARD -->
@@ -256,7 +256,7 @@
         let currentMarketAvg = 0;
         let currentRepairedAvg = 0;
         let shortlist = [];
-        let currentReceiptFile = null;
+        let currentReceiptBase64 = null;
 
         let models = {
             'Nissan': ['Qashqai', 'Juke', 'Micra', 'X-Trail', 'Note', 'Leaf', 'Navara'],
@@ -397,23 +397,48 @@
             }
         }
 
-        // --- RECEIPT SCANNER LOGIC ---
+        // --- RECEIPT SCANNER LOGIC (v2.1) ---
         function previewReceipt(event) {
             const file = event.target.files[0];
             if (!file) return;
-            currentReceiptFile = file;
-            
-            const preview = document.getElementById('receiptPreview');
-            preview.src = URL.createObjectURL(file);
-            preview.style.display = 'block';
-            
-            document.getElementById('btnUploadReceipt').style.display = 'block';
-            document.getElementById('receiptFeedback').innerText = '';
+
+            const feedback = document.getElementById('receiptFeedback');
+            feedback.style.color = '#0284C7';
+            feedback.innerText = 'Processing image...';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // Compress photo to max 1600px for fast, reliable upload
+                    const canvas = document.createElement('canvas');
+                    const maxDim = 1600;
+                    let w = img.width;
+                    let h = img.height;
+                    if (w > h && w > maxDim) { h *= maxDim / w; w = maxDim; }
+                    else if (h > maxDim) { w *= maxDim / h; h = maxDim; }
+
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+
+                    currentReceiptBase64 = canvas.toDataURL('image/jpeg', 0.82);
+
+                    const preview = document.getElementById('receiptPreview');
+                    preview.src = currentReceiptBase64;
+                    preview.style.display = 'block';
+
+                    document.getElementById('btnUploadReceipt').style.display = 'block';
+                    feedback.innerText = `Ready to upload (~${Math.round(currentReceiptBase64.length * 0.75 / 1024)} KB)`;
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
 
-        // FIXED UPLOAD LOGIC
         async function uploadReceipt() {
-            if (!currentReceiptFile) return;
+            if (!currentReceiptBase64) return;
             const btn = document.getElementById('btnUploadReceipt');
             const feedback = document.getElementById('receiptFeedback');
 
@@ -423,37 +448,42 @@
             feedback.innerText = 'Sending to Google Drive Inbox...';
 
             try {
-                const formData = new FormData();
-                formData.append('file', currentReceiptFile);
-
                 const res = await fetch(`${API_URL}/api/upload-receipt`, {
                     method: 'POST',
-                    body: formData
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: currentReceiptBase64,
+                        mimeType: 'image/jpeg'
+                    })
                 });
 
-                // Read the actual response from the Cloudflare Worker
-                const responseData = await res.json();
+                const responseText = await res.text();
+                let responseData;
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (e) {
+                    throw new Error("Server returned non-JSON: " + responseText.substring(0, 100));
+                }
 
                 if (res.ok && responseData.success) {
                     feedback.style.color = '#16A34A';
-                    feedback.innerText = '✅ Receipt successfully uploaded to laptop inbox!';
+                    const sizeKb = responseData.size ? Math.round(responseData.size / 1024) + ' KB' : 'OK';
+                    feedback.innerText = `✅ Uploaded to Drive! (${sizeKb})`;
+                    currentReceiptBase64 = null;
+                    document.getElementById('receiptCamera').value = '';
                     setTimeout(() => {
                         document.getElementById('receiptPreview').style.display = 'none';
                         btn.style.display = 'none';
-                        feedback.innerText = '';
                     }, 4000);
                 } else {
-                    // Force the screen to display the exact backend error
                     throw new Error(responseData.error || "Unknown Server Error");
                 }
             } catch (err) {
                 feedback.style.color = '#EF4444';
-                feedback.innerText = '❌ ' + err.message; // Prints the real error on screen
+                feedback.innerText = '❌ ' + err.message;
             } finally {
                 btn.disabled = false;
                 btn.innerText = '☁️ Upload to Laptop Inbox';
-                currentReceiptFile = null;
-                document.getElementById('receiptCamera').value = '';
             }
         }
         // -----------------------------
