@@ -411,6 +411,7 @@
             document.getElementById('receiptFeedback').innerText = '';
         }
 
+        // FIXED UPLOAD LOGIC
         async function uploadReceipt() {
             if (!currentReceiptFile) return;
             const btn = document.getElementById('btnUploadReceipt');
@@ -425,13 +426,15 @@
                 const formData = new FormData();
                 formData.append('file', currentReceiptFile);
 
-                // This pushes the image to your existing Cloudflare Worker to pass to Drive
                 const res = await fetch(`${API_URL}/api/upload-receipt`, {
                     method: 'POST',
                     body: formData
                 });
 
-                if (res.ok) {
+                // Read the actual response from the Cloudflare Worker
+                const responseData = await res.json();
+
+                if (res.ok && responseData.success) {
                     feedback.style.color = '#16A34A';
                     feedback.innerText = '✅ Receipt successfully uploaded to laptop inbox!';
                     setTimeout(() => {
@@ -440,11 +443,12 @@
                         feedback.innerText = '';
                     }, 4000);
                 } else {
-                    throw new Error('Upload failed');
+                    // Force the screen to display the exact backend error
+                    throw new Error(responseData.error || "Unknown Server Error");
                 }
             } catch (err) {
                 feedback.style.color = '#EF4444';
-                feedback.innerText = '❌ Error uploading receipt. Please try again.';
+                feedback.innerText = '❌ ' + err.message; // Prints the real error on screen
             } finally {
                 btn.disabled = false;
                 btn.innerText = '☁️ Upload to Laptop Inbox';
