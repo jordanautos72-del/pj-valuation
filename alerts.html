@@ -163,8 +163,10 @@
         <h3 style="margin-top:0; font-size:14px; color:#0F172A;">Active Background Scanners</h3>
         <div id="activeAlertsList" style="margin-bottom: 16px;"></div>
 
-        <button class="btn-danger-outline" onclick="clearAlertCache()">🔄 Clear Sent-Ad Cache & Re-run</button>
-        <div id="cacheFeedback" style="font-size: 11px; margin-top: 6px; color: #EF4444; text-align: center;"></div>
+        <button class="btn-primary" onclick="toggleAllAlerts()" style="background: #1E293B; width: 100%; margin-bottom: 10px;">⏻ Master Switch (Pause/Resume All)</button>
+
+        <button class="btn-danger-outline" onclick="clearAlertCache()" style="margin-top: 0;">🔄 Clear Sent-Ad Cache & Re-run</button>
+        <div id="cacheFeedback" style="font-size: 11px; margin-top: 6px; font-weight: bold; text-align: center;"></div>
 
         <hr style="border:0; border-top:1px solid #E2E8F0; margin: 16px 0;">
 
@@ -193,7 +195,7 @@
         <div style="margin-top: 10px; display: flex; gap: 8px;" id="formBtnRow">
             <button class="btn-success" id="saveAlertBtn" onclick="saveAlert()">＋ Add Alert to Scanners</button>
         </div>
-        <div id="alertFeedback" style="font-size: 11px; margin-top: 10px; color: #0284C7; text-align: center;"></div>
+        <div id="alertFeedback" style="font-size: 11px; margin-top: 10px; font-weight: bold; text-align: center;"></div>
 
         <hr style="border:0; border-top:1px solid #E2E8F0; margin: 16px 0;">
 
@@ -397,6 +399,122 @@
             }
         }
 
+        // --- ALERTS AND SCANNER CONFIG LOGIC ---
+
+        async function loadAlertConfig() {
+            try {
+                const res = await fetch(`${API_URL}/api/config`);
+                const data = await res.json();
+                savedAlerts = Array.isArray(data) ? data : [];
+                renderAlerts();
+            } catch(e) { 
+                savedAlerts = []; 
+                renderAlerts(); 
+            }
+        }
+
+        async function saveAlertConfig() {
+            try {
+                await fetch(`${API_URL}/api/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(savedAlerts)
+                });
+            } catch(e) {}
+        }
+
+        function renderAlerts() {
+            const list = document.getElementById('activeAlertsList');
+            list.innerHTML = '';
+            if (savedAlerts.length === 0) {
+                list.innerHTML = '<div style="font-size: 12px; color: #64748B;">No active scanners configured.</div>';
+                return;
+            }
+            savedAlerts.forEach((alert, index) => {
+                const isActive = alert.active !== false; 
+                const prefix = isActive ? '🟢 [LIVE]' : '⏸️ [PAUSED]';
+                const summary = `${alert.make} ${alert.model} (${alert.section}) | Yrs: ${alert.yearFrom}-${alert.yearTo === 9999 ? 'Any' : alert.yearTo}`;
+                
+                list.innerHTML += `
+                    <div class="active-alert-item" style="opacity: ${isActive ? '1' : '0.6'}">
+                        <div>
+                            <div class="active-alert-info">${prefix} ${summary}</div>
+                            <div class="active-alert-sub">Max: €${alert.price} ${alert.targetKeywords ? '| Keywords: ' + alert.targetKeywords : ''}</div>
+                        </div>
+                        <div class="alert-actions">
+                            <button class="btn-edit-alert" style="background:#64748B; color:white;" onclick="toggleAlert(${index})">⏯</button>
+                            <button class="btn-delete-alert" onclick="deleteAlert(${index})">🗑</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        async function saveAlert() {
+            const btn = document.getElementById('saveAlertBtn');
+            btn.innerText = 'Saving...';
+            btn.disabled = true;
+            
+            const newAlert = {
+                section: document.getElementById('alertSection').value,
+                make: document.getElementById('alertMake').value,
+                model: document.getElementById('alertModel').value,
+                yearFrom: parseInt(document.getElementById('alertYearFrom').value) || 0,
+                yearTo: parseInt(document.getElementById('alertYearTo').value) || 9999,
+                minPrice: parseFloat(document.getElementById('alertMinPrice').value) || 0,
+                price: parseFloat(document.getElementById('alertPrice').value) || 999999,
+                minDom: parseInt(document.getElementById('alertMinDom').value) || 0,
+                targetKeywords: '',
+                excludeKeywords: '',
+                active: true
+            };
+
+            savedAlerts = savedAlerts.filter(a => !(a.make === newAlert.make && a.model === newAlert.model && a.section === newAlert.section));
+            savedAlerts.push(newAlert);
+
+            await saveAlertConfig();
+            
+            const feedback = document.getElementById('alertFeedback');
+            feedback.style.color = '#16A34A';
+            feedback.innerText = "Scanner synced successfully!";
+            renderAlerts();
+            
+            setTimeout(() => {
+                feedback.innerText = '';
+                btn.innerText = '＋ Add Alert to Scanners';
+                btn.disabled = false;
+            }, 2000);
+        }
+
+        async function toggleAlert(index) {
+            savedAlerts[index].active = !(savedAlerts[index].active !== false);
+            await saveAlertConfig();
+            renderAlerts();
+        }
+
+        async function toggleAllAlerts() {
+            if (savedAlerts.length === 0) return;
+            const anyActive = savedAlerts.some(a => a.active !== false);
+            savedAlerts.forEach(a => a.active = !anyActive);
+
+            const feedback = document.getElementById('cacheFeedback');
+            feedback.style.color = '#0284C7';
+            feedback.innerText = "Updating scanners...";
+
+            await saveAlertConfig();
+            
+            feedback.style.color = '#16A34A';
+            feedback.innerText = anyActive ? "All scanners paused!" : "All scanners activated!";
+            setTimeout(() => feedback.innerText = '', 3000);
+            renderAlerts();
+        }
+
+        async function deleteAlert(index) {
+            savedAlerts.splice(index, 1);
+            await saveAlertConfig();
+            renderAlerts();
+        }
+
         // --- RECEIPT SCANNER LOGIC (v2.1) ---
         function previewReceipt(event) {
             const file = event.target.files[0];
@@ -410,7 +528,6 @@
             reader.onload = function(e) {
                 const img = new Image();
                 img.onload = function() {
-                    // Compress photo to max 1600px for fast, reliable upload
                     const canvas = document.createElement('canvas');
                     const maxDim = 1600;
                     let w = img.width;
@@ -646,11 +763,13 @@
 
         async function clearAlertCache() {
             const feedback = document.getElementById('cacheFeedback');
+            feedback.style.color = '#EF4444';
             feedback.innerText = "Clearing sent-ad history...";
             try {
                 const res = await fetch(`${API_URL}/api/clear-cache`);
                 const data = await res.json();
                 if (data.success) {
+                    feedback.style.color = '#16A34A';
                     feedback.innerText = "Cache cleared!";
                     setTimeout(() => feedback.innerText = '', 3000);
                     triggerInstantScan();
@@ -792,14 +911,6 @@
             }
             const maxBuyIn = baseValue - repairs - profit;
             document.getElementById('calcMaxBuyIn').innerText = maxBuyIn > 0 ? '€' + Math.round(maxBuyIn).toLocaleString() : '€0 (Too tight)';
-        }
-
-        async function loadAlertConfig() {
-            try {
-                const res = await fetch(`${API_URL}/api/config`);
-                const data = await res.json();
-                savedAlerts = Array.isArray(data) ? data : [];
-            } catch(e) { savedAlerts = []; }
         }
 
         initDropdowns();
