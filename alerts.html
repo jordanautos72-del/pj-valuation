@@ -80,12 +80,13 @@
 <body>
 
     <div class="header">
-        <h1>PJ MARKET VALUATION <span style="font-size:10px; color:#94A3B8;">v2.1</span></h1>
-        <span id="modeTitle">Standard Valuation</span>
+        <h1>PJ WORKSHOP HUB <span style="font-size:10px; color:#94A3B8;">v2.2</span></h1>
+        <span id="modeTitle">Mileage Logger</span>
     </div>
 
     <div class="nav-tabs">
-        <button class="nav-tab active" id="tabStandard" onclick="switchMode('cars')">Standard</button>
+        <button class="nav-tab active" id="tabMileage" onclick="switchMode('mileage')">🚗 Mileage</button>
+        <button class="nav-tab" id="tabStandard" onclick="switchMode('cars')">Standard</button>
         <button class="nav-tab" id="tabSalvage" onclick="switchMode('damagedcars')">Salvage</button>
         <button class="nav-tab" id="tabAlerts" onclick="switchMode('alerts')">Alerts</button>
         <button class="nav-tab" id="tabHitList" onclick="switchMode('hitlist')">🎯 Hit List</button>
@@ -93,8 +94,38 @@
         <button class="nav-tab" id="tabReceipts" onclick="switchMode('receipts')">🧾 Receipts</button>
     </div>
 
+    <!-- MILEAGE CARD -->
+    <div class="card" id="mileageCard">
+        <h3 style="margin-top:0; font-size:14px; color:#0F172A;">🚗 Log Mileage Expense</h3>
+        <div style="font-size: 11px; color: #64748B; margin-bottom: 14px;">Records directly to 'Overheads' in Google Drive.</div>
+        
+        <div class="field-group">
+            <label>Date</label>
+            <input type="date" id="milDate">
+        </div>
+        <div class="field-group">
+            <label>Vehicle Reg</label>
+            <input type="text" id="milReg" placeholder="e.g. 141G4505" style="text-transform: uppercase;">
+        </div>
+        <div class="field-group">
+            <label>Destination / Purpose</label>
+            <input type="text" id="milDest" placeholder="e.g. CCR Salvage">
+        </div>
+        <div class="row-group">
+            <div class="field-group"><label>Round Trip (Mi)</label><input type="number" id="milMiles" value="" placeholder="50" oninput="calcMil()"></div>
+            <div class="field-group"><label>Rate (€/mi)</label><input type="number" step="0.01" id="milRate" value="0.25" oninput="calcMil()"></div>
+        </div>
+        <div class="calc-result" style="margin-bottom: 14px; background: #F1F5F9; border: 1px solid #CBD5E1;">
+            <span class="calc-result-lbl" style="color: #475569;">TOTAL CLAIM (GROSS)</span>
+            <span class="calc-result-val" id="milTotal" style="color: #0F172A;">€0.00</span>
+        </div>
+        
+        <button class="btn-primary" style="width: 100%;" id="btnSubmitMil" onclick="submitMileage()">📝 Save to Overheads</button>
+        <div id="milFeedback" style="font-size: 12px; font-weight: bold; margin-top: 10px; text-align: center; word-break: break-word;"></div>
+    </div>
+
     <!-- MAIN SEARCH CARD -->
-    <div class="card" id="searchCard">
+    <div class="card" id="searchCard" style="display: none;">
         <div class="field-group">
             <label>Make</label>
             <select id="makeSelect" onchange="updateModels()"></select>
@@ -146,7 +177,7 @@
 
     <!-- RECEIPT UPLOAD CARD -->
     <div class="card" id="receiptsCard" style="display: none;">
-        <h3 style="margin-top:0; font-size:14px; color:#0F172A;">📸 Snap & Upload Receipt (v2.1)</h3>
+        <h3 style="margin-top:0; font-size:14px; color:#0F172A;">📸 Snap & Upload Receipt</h3>
         <div style="font-size: 11px; color: #64748B; margin-bottom: 16px;">Capture a photo of a physical receipt to sync it directly to your laptop's Drive inbox.</div>
 
         <input type="file" accept="image/*" capture="environment" id="receiptCamera" style="display:none" onchange="previewReceipt(event)">
@@ -206,7 +237,7 @@
     </div>
 
     <!-- KPI DASHBOARD -->
-    <div class="kpi-container" id="kpiDashboard">
+    <div class="kpi-container" id="kpiDashboard" style="display: none;">
         <div class="kpi kpi-purple" id="kpiRepaired" style="display: none;">
             <div><div class="kpi-title">EST. REPAIRED VALUE</div><div class="kpi-sub">Standard Market Average</div></div>
             <div class="kpi-val" id="statRepaired">€0</div>
@@ -226,7 +257,7 @@
     </div>
 
     <!-- MARGIN & REPAIR CALCULATOR BOX -->
-    <div class="calculator-card" id="marginCalcCard">
+    <div class="calculator-card" id="marginCalcCard" style="display: none;">
         <div class="calc-title">
             <span id="calcTitleText">⚙️ Trade Buy-In & Margin Calculator</span>
             <span style="font-size: 10px; color: #64748B;" id="calcSubText">Based on Market Avg</span>
@@ -247,11 +278,11 @@
         </div>
     </div>
 
-    <div class="status-bar" id="statusBar">Ready. Select vehicle and tap Check Market.</div>
-    <div id="listingsList"></div>
+    <div class="status-bar" id="statusBar" style="display: none;">Ready. Select vehicle and tap Check Market.</div>
+    <div id="listingsList" style="display: none;"></div>
 
     <script>
-        let currentSection = 'cars';
+        let currentSection = 'mileage';
         const API_URL = 'https://pj-val-proxy.pauljordanie.workers.dev';
         let savedAlerts = [];
         let editingIndex = null;
@@ -277,6 +308,9 @@
         };
 
         async function initDropdowns() {
+            // Set today's date on the mileage tab
+            document.getElementById('milDate').valueAsDate = new Date();
+
             try {
                 const res = await fetch(`${API_URL}/api/models`);
                 if (res.ok) {
@@ -337,6 +371,7 @@
         }
 
         function switchMode(section) {
+            document.getElementById('tabMileage').className = section === 'mileage' ? 'nav-tab active' : 'nav-tab';
             document.getElementById('tabStandard').className = section === 'cars' ? 'nav-tab active' : 'nav-tab';
             document.getElementById('tabSalvage').className = section === 'damagedcars' ? 'nav-tab active' : 'nav-tab';
             document.getElementById('tabHitList').className = section === 'hitlist' ? 'nav-tab active' : 'nav-tab';
@@ -344,6 +379,7 @@
             document.getElementById('tabShortlist').className = section === 'shortlist' ? 'nav-tab active' : 'nav-tab';
             document.getElementById('tabReceipts').className = section === 'receipts' ? 'nav-tab active' : 'nav-tab';
 
+            document.getElementById('mileageCard').style.display = section === 'mileage' ? 'block' : 'none';
             document.getElementById('searchCard').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
             document.getElementById('kpiDashboard').style.display = (section === 'cars' || section === 'damagedcars') ? 'flex' : 'none';
             document.getElementById('marginCalcCard').style.display = (section === 'cars' || section === 'damagedcars') ? 'block' : 'none';
@@ -354,7 +390,9 @@
             document.getElementById('shortlistCard').style.display = section === 'shortlist' ? 'block' : 'none';
             document.getElementById('receiptsCard').style.display = section === 'receipts' ? 'block' : 'none';
 
-            if (section === 'alerts') {
+            if (section === 'mileage') {
+                document.getElementById('modeTitle').innerText = 'Mileage Logger';
+            } else if (section === 'alerts') {
                 document.getElementById('modeTitle').innerText = 'Multi-Alert Scanners';
                 loadAlertConfig().then(() => triggerInstantScan());
             } else if (section === 'hitlist') {
@@ -396,6 +434,78 @@
                     document.getElementById('calcResultLbl').innerText = 'MAX SAFE BUY-IN CEILING';
                 }
                 calculateTradeMargin();
+            }
+        }
+
+        // --- MILEAGE LOGGER LOGIC ---
+        function calcMil() {
+            const miles = parseFloat(document.getElementById('milMiles').value) || 0;
+            const rate = parseFloat(document.getElementById('milRate').value) || 0;
+            const gross = miles * rate;
+            document.getElementById('milTotal').innerText = `€${gross.toFixed(2)}`;
+        }
+
+        async function submitMileage() {
+            const dateStr = document.getElementById('milDate').value;
+            const parts = dateStr.split('-');
+            const formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY formatting
+
+            const reg = document.getElementById('milReg').value.toUpperCase();
+            const dest = document.getElementById('milDest').value;
+            const miles = parseFloat(document.getElementById('milMiles').value) || 0;
+            const rate = parseFloat(document.getElementById('milRate').value) || 0.25;
+            
+            if (!reg || miles <= 0) {
+                alert("Please enter a valid Registration and distance (miles).");
+                return;
+            }
+
+            // Calculate financial split (Assuming standard 23% VAT based on ledger screenshots)
+            const gross = miles * rate;
+            const net = gross / 1.23;
+            const vat = gross - net;
+            
+            const notes = `${dest} (${miles.toFixed(1)} mi @ €${rate.toFixed(2)}/mi)`;
+            
+            const btn = document.getElementById('btnSubmitMil');
+            const feedback = document.getElementById('milFeedback');
+            btn.disabled = true;
+            btn.innerText = 'Writing to Drive...';
+            feedback.innerText = '';
+            
+            try {
+                const res = await fetch(`${API_URL}/api/finance/mileage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        date: formattedDate,
+                        reg: reg,
+                        net: net,
+                        gross: gross,
+                        vat: vat,
+                        notes: notes
+                    })
+                });
+                
+                const data = await res.json();
+                if(res.ok && data.success) {
+                    feedback.style.color = '#16A34A';
+                    feedback.innerText = '✅ Saved securely to Overheads sheet!';
+                    setTimeout(() => {
+                        feedback.innerText = '';
+                        document.getElementById('milDest').value = '';
+                        document.getElementById('milMiles').value = '';
+                        calcMil();
+                    }, 3000);
+                } else {
+                    throw new Error(data.error || 'Server error');
+                }
+            } catch(e) {
+                feedback.style.color = '#DC2626';
+                feedback.innerText = '❌ Failed to save: ' + e.message;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '📝 Save to Overheads';
             }
         }
 
