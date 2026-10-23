@@ -81,7 +81,7 @@
 <body>
 
     <div class="header">
-        <h1>PJ WORKSHOP HUB <span style="font-size:10px; color:#94A3B8;">v2.4</span></h1>
+        <h1>PJ WORKSHOP HUB <span style="font-size:10px; color:#94A3B8;">v2.5</span></h1>
         <span id="modeTitle">Mileage Logger</span>
     </div>
 
@@ -161,19 +161,19 @@
         <div id="shortlistFeed"></div>
     </div>
 
-    <!-- HIT LIST CARD (MATCHED TO DESKTOP PC EXE) -->
+    <!-- HIT LIST CARD (EXACT YEAR-MATCH MARGIN FINDER) -->
     <div class="card" id="hitListCard" style="display: none;">
-        <h3 style="margin-top:0; font-size:14px; color:#DC2626;">🎯 Stagnant Inventory (45+ Days) & AI Flip Radar</h3>
-        <div style="font-size: 11px; color: #64748B; margin-bottom: 12px;">High-leverage vehicles sitting past their prime, or run an AI batch scan across DoneDeal to calculate viable margins.</div>
+        <h3 style="margin-top:0; font-size:14px; color:#DC2626;">🎯 Stagnant Inventory (45+ Days) & Deal Finder</h3>
+        <div style="font-size: 11px; color: #64748B; margin-bottom: 12px;">Scan stagnant 45+ day stock or run a live batch comparison against exact-year retail prices.</div>
         
         <div style="display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap;">
             <button class="btn-primary" onclick="loadHitList('damagedcars')" id="btnHitSalvage" style="flex:1;">💥 Salvage Hit List</button>
             <button class="btn-sec" onclick="loadHitList('cars')" id="btnHitStandard" style="flex:1;">🚗 Standard Hit List</button>
-            <button class="btn-sec" onclick="runAiDealFinder()" id="btnHitAi" style="flex:1; background:#8B5CF6; color:#FFF;">🤖 AI Deal Finder</button>
+            <button class="btn-sec" onclick="runAiDealFinder()" id="btnHitAi" style="flex:1; background:#8B5CF6; color:#FFF;">⚡ Deal Finder (Batch)</button>
         </div>
 
         <div id="hitListFeed">
-            <div style="font-size: 12px; color: #0284C7; font-style: italic;">Click a category above or run the AI Deal Finder...</div>
+            <div style="font-size: 12px; color: #0284C7; font-style: italic;">Click a category above or run the Deal Finder...</div>
         </div>
     </div>
 
@@ -309,7 +309,7 @@
             'Citroen': ['C3', 'C4', 'Berlingo', 'C4 Cactus', 'Dispatch', 'Relay']
         };
 
-        // Strict filter to eliminate parts, breaking, and wanted ads just like the PC EXE
+        // Strict filter to eliminate parts, breaking, and wanted ads
         const JUNK_KEYWORDS = [
             'breaking', 'for parts', 'parts only', 'spares', 'dismantling', 'shell', 
             'engine only', 'gearbox only', 'wheels', 'alloys', 'headlight', 'bumper', 
@@ -321,17 +321,14 @@
             if (!ad || !ad.title) return false;
             const t = ad.title.toLowerCase();
             
-            // 1. Block any parts / breaking / wanted keywords
             for (let kw of JUNK_KEYWORDS) {
                 if (t.includes(kw)) return false;
             }
             
-            // 2. Block €1, €10, €50, €100, €1234 dummy prices used by breakers
             if (!ad.price || ad.price < 250 || ad.price === 1234 || ad.price === 12345 || ad.price === 99999) {
                 return false;
             }
 
-            // 3. Enforce a valid registration year (Parts ads almost always have year === "N/A")
             if (!ad.year || ad.year === "N/A") {
                 return false;
             }
@@ -341,6 +338,13 @@
             }
 
             return true;
+        }
+
+        function getMedian(arr) {
+            if (!arr || arr.length === 0) return 0;
+            const s = [...arr].sort((a, b) => a - b);
+            const mid = Math.floor(s.length / 2);
+            return s.length % 2 !== 0 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
         }
 
         async function initDropdowns() {
@@ -431,7 +435,7 @@
                 document.getElementById('modeTitle').innerText = 'Multi-Alert Scanners';
                 loadAlertConfig().then(() => triggerInstantScan());
             } else if (section === 'hitlist') {
-                document.getElementById('modeTitle').innerText = '🎯 Hit List & AI Deal Finder';
+                document.getElementById('modeTitle').innerText = '🎯 Hit List & Deal Finder';
                 loadAlertConfig();
             } else if (section === 'shortlist') {
                 document.getElementById('modeTitle').innerText = '⭐ Saved Shortlist';
@@ -652,7 +656,7 @@
             renderAlerts();
         }
 
-        // --- RECEIPT SCANNER LOGIC (v2.1) ---
+        // --- RECEIPT SCANNER LOGIC ---
         function previewReceipt(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -831,7 +835,7 @@
             });
         }
 
-        // --- HIT LIST & AI DEAL FINDER LOGIC (MATCHING PC EXE) ---
+        // --- HIT LIST & EXACT-YEAR DEAL FINDER ---
         async function loadHitList(category) {
             document.getElementById('btnHitSalvage').className = category === 'damagedcars' ? 'btn-primary' : 'btn-sec';
             document.getElementById('btnHitStandard').className = category === 'cars' ? 'btn-primary' : 'btn-sec';
@@ -848,7 +852,6 @@
 
             let targets = savedAlerts.filter(a => a.section === category && a.active !== false);
             if (targets.length === 0) {
-                // Fallback default broad scan if no alerts configured for this category
                 targets = [{ make: 'Any', model: 'Any', section: category, yearFrom: 2012, yearTo: new Date().getFullYear(), minPrice: 350, price: 6500 }];
             }
 
@@ -915,25 +918,24 @@
             document.getElementById('btnHitAi').style.color = '#FFFFFF';
             
             const feed = document.getElementById('hitListFeed');
-            feed.innerHTML = '<div style="font-size:12px; color:#8B5CF6; font-weight:bold;">🔍 Running DoneDeal Batch Scan & AI Flip Radar...</div>';
+            feed.innerHTML = '<div style="font-size:12px; color:#8B5CF6; font-weight:bold;">🔍 Scanning live DoneDeal batches & matching exact-year retail prices...</div>';
 
             try {
                 if (!savedAlerts || savedAlerts.length === 0) {
                     await loadAlertConfig();
                 }
 
-                // Gather active profiles or use comprehensive default trade batch profiles like PC EXE
                 let batchProfiles = savedAlerts.filter(a => a.active !== false);
                 if (batchProfiles.length === 0) {
                     batchProfiles = [
-                        { make: 'Ford', model: 'Mondeo', section: 'damagedcars', yearFrom: 2013, yearTo: 2022, minPrice: 350, price: 4000 },
-                        { make: 'Ford', model: 'Focus', section: 'damagedcars', yearFrom: 2013, yearTo: 2022, minPrice: 350, price: 4000 },
-                        { make: 'Volkswagen', model: 'Golf', section: 'damagedcars', yearFrom: 2012, yearTo: 2022, minPrice: 400, price: 4500 },
-                        { make: 'Volkswagen', model: 'Passat', section: 'damagedcars', yearFrom: 2012, yearTo: 2022, minPrice: 400, price: 4500 },
-                        { make: 'Hyundai', model: 'Tucson', section: 'damagedcars', yearFrom: 2014, yearTo: 2022, minPrice: 500, price: 5500 },
-                        { make: 'Peugeot', model: '308', section: 'damagedcars', yearFrom: 2013, yearTo: 2022, minPrice: 350, price: 3500 },
-                        { make: 'Skoda', model: 'Octavia', section: 'damagedcars', yearFrom: 2013, yearTo: 2022, minPrice: 400, price: 4500 },
-                        { make: 'Toyota', model: 'Corolla', section: 'damagedcars', yearFrom: 2012, yearTo: 2022, minPrice: 400, price: 4500 }
+                        { make: 'Ford', model: 'Mondeo', section: 'damagedcars', yearFrom: 2012, yearTo: 2019, minPrice: 350, price: 3500 },
+                        { make: 'Ford', model: 'Focus', section: 'damagedcars', yearFrom: 2012, yearTo: 2019, minPrice: 350, price: 3500 },
+                        { make: 'Volkswagen', model: 'Golf', section: 'damagedcars', yearFrom: 2012, yearTo: 2019, minPrice: 400, price: 4000 },
+                        { make: 'Volkswagen', model: 'Passat', section: 'damagedcars', yearFrom: 2012, yearTo: 2019, minPrice: 400, price: 4000 },
+                        { make: 'Hyundai', model: 'Tucson', section: 'damagedcars', yearFrom: 2014, yearTo: 2020, minPrice: 500, price: 4500 },
+                        { make: 'Peugeot', model: '308', section: 'damagedcars', yearFrom: 2012, yearTo: 2019, minPrice: 350, price: 3200 },
+                        { make: 'Skoda', model: 'Octavia', section: 'damagedcars', yearFrom: 2012, yearTo: 2019, minPrice: 400, price: 4000 },
+                        { make: 'Toyota', model: 'Corolla', section: 'damagedcars', yearFrom: 2011, yearTo: 2018, minPrice: 400, price: 4000 }
                     ];
                 }
 
@@ -944,12 +946,12 @@
                     const make = prof.make || 'Any';
                     const model = prof.model || 'Any';
                     const sec = prof.section || 'damagedcars';
-                    const yFrom = parseInt(prof.yearFrom) || 2012;
-                    const yTo = parseInt(prof.yearTo) || new Date().getFullYear();
+                    const yFrom = parseInt(prof.yearFrom) || 2011;
+                    const yTo = parseInt(prof.yearTo) || 2020;
                     const minP = Math.max(parseFloat(prof.minPrice) || 350, sec === 'damagedcars' ? 300 : 500);
-                    const maxP = parseFloat(prof.price) || 6000;
+                    const maxP = parseFloat(prof.price) || 5000;
 
-                    feed.innerHTML = `<div style="font-size:12px; color:#8B5CF6; font-style:italic;">Scanning batch (${i + 1}/${batchProfiles.length}): ${make} ${model} (${sec === 'damagedcars' ? 'Salvage' : 'Standard'})...</div>`;
+                    feed.innerHTML = `<div style="font-size:12px; color:#8B5CF6; font-style:italic;">Scanning batch (${i + 1}/${batchProfiles.length}): ${make} ${model}...</div>`;
 
                     try {
                         let searchWord = (model === "Any" || model === "") ? make : model;
@@ -958,40 +960,54 @@
                             yearFrom: yFrom, yearTo: yTo, minPrice: minP, maxPrice: maxP, minDom: 0
                         };
 
-                        // Also fetch standard market average so we know the true retail resale value
                         const stdPayload = {
                             make: make, model: searchWord, section: 'cars',
-                            yearFrom: yFrom, yearTo: yTo, minPrice: 1200, maxPrice: 25000, minDom: 0
+                            yearFrom: yFrom, yearTo: yTo, minPrice: 1200, maxPrice: 18000, minDom: 0
                         };
 
                         const [mainRes, stdRes] = await Promise.all([
                             fetch(`${API_URL}/api/search`, { method: 'POST', body: JSON.stringify(mainPayload), headers: { 'Content-Type': 'application/json' } }).then(r => r.ok ? r.json() : null).catch(() => null),
-                            sec === 'damagedcars' 
-                                ? fetch(`${API_URL}/api/search`, { method: 'POST', body: JSON.stringify(stdPayload), headers: { 'Content-Type': 'application/json' } }).then(r => r.ok ? r.json() : null).catch(() => null)
-                                : Promise.resolve(null)
+                            fetch(`${API_URL}/api/search`, { method: 'POST', body: JSON.stringify(stdPayload), headers: { 'Content-Type': 'application/json' } }).then(r => r.ok ? r.json() : null).catch(() => null)
                         ]);
 
                         if (!mainRes || !mainRes.listings) continue;
 
-                        const retailAvg = (sec === 'damagedcars' && stdRes && stdRes.stats && stdRes.stats.avg > 0)
-                            ? stdRes.stats.avg
-                            : (mainRes.stats ? mainRes.stats.avg : 0);
-                        const tradeLow = mainRes.stats ? mainRes.stats.low : 0;
+                        // Group standard retail listings by EXACT year so a 2012 car is ONLY compared against 2012 retail cars!
+                        const stdListings = (stdRes && stdRes.listings) ? stdRes.listings.filter(a => isRealVehicleAd(a, yFrom)) : [];
+                        const pricesByYear = {};
+                        stdListings.forEach(a => {
+                            const y = parseInt(a.year);
+                            if (!isNaN(y)) {
+                                if (!pricesByYear[y]) pricesByYear[y] = [];
+                                pricesByYear[y].push(a.price);
+                            }
+                        });
 
                         mainRes.listings.forEach(ad => {
                             if (!isRealVehicleAd(ad, yFrom)) return;
                             if (candidateDeals.find(d => d.adUrl === ad.adUrl)) return;
 
-                            let estRetail = retailAvg > ad.price ? retailAvg : Math.round(ad.price * 1.45);
-                            let grossSpread = estRetail - ad.price;
+                            const adY = parseInt(ad.year);
+                            // Collect retail prices from the exact same year (or +/- 1 year if sample is small)
+                            let yearPrices = pricesByYear[adY] ? [...pricesByYear[adY]] : [];
+                            if (yearPrices.length < 3) {
+                                if (pricesByYear[adY - 1]) yearPrices.push(...pricesByYear[adY - 1]);
+                                if (pricesByYear[adY + 1]) yearPrices.push(...pricesByYear[adY + 1]);
+                            }
 
-                            // Filter for genuine flip margin opportunities or stagnant bargains
-                            if (sec === 'damagedcars' || ad.price <= tradeLow * 1.15 || ad.daysOnMarket >= 25 || grossSpread >= 1000) {
+                            let exactYearRetail = getMedian(yearPrices);
+                            if (exactYearRetail <= 0) return; // Skip if we can't verify true same-year retail value
+
+                            let grossSpread = exactYearRetail - ad.price;
+
+                            // Only include genuine below-market opportunities where same-year retail is at least €1,200 above asking
+                            if (grossSpread >= 1200) {
                                 candidateDeals.push({
                                     ...ad,
                                     sectionType: sec === 'damagedcars' ? 'Salvage' : 'Standard',
-                                    estRetail: Math.round(estRetail),
-                                    grossSpread: Math.round(grossSpread)
+                                    estRetail: Math.round(exactYearRetail),
+                                    grossSpread: Math.round(grossSpread),
+                                    sampleCount: yearPrices.length
                                 });
                             }
                         });
@@ -999,24 +1015,17 @@
                 }
 
                 if (candidateDeals.length === 0) {
-                    feed.innerHTML = '<div style="font-size:12px; color:#64748B; font-style:italic;">No high-margin whole vehicles found in this batch (all parts/breakers excluded). Add more models in Alerts or widen your price range.</div>';
+                    feed.innerHTML = '<div style="font-size:12px; color:#64748B; font-style:italic;">No high-margin whole vehicles found in this batch.</div>';
                     return;
                 }
 
-                // Rank by best potential spread + days on market leverage
-                candidateDeals.sort((a, b) => (b.grossSpread + (b.daysOnMarket * 15)) - (a.grossSpread + (a.daysOnMarket * 15)));
+                // Sort by highest realistic same-year spread
+                candidateDeals.sort((a, b) => b.grossSpread - a.grossSpread);
                 const topCandidates = candidateDeals.slice(0, 20);
 
-                // Render cards immediately with baseline margin calculations, then enrich top deals via Cloudflare /api/ai-estimate
-                feed.innerHTML = `<div style="font-size:11px; color:#16A34A; font-weight:bold; margin-bottom:8px;">✅ Found ${topCandidates.length} verified whole-car flip targets (Parts filtered out):</div>`;
+                feed.innerHTML = `<div style="font-size:11px; color:#16A34A; font-weight:bold; margin-bottom:8px;">✅ Found ${topCandidates.length} deals (Matched against exact-year retail prices):</div>`;
 
-                topCandidates.forEach((item, idx) => {
-                    const targetOffer = item.sectionType === 'Salvage' ? Math.round(item.price * 0.80) : Math.round(item.price * 0.88);
-                    const estPartsDefault = item.sectionType === 'Salvage' ? 550 : 300;
-                    const estNetProfit = Math.max(0, item.estRetail - targetOffer - estPartsDefault);
-
-                    const baseStrategy = `Est. Retail Value: €${item.estRetail.toLocaleString()} | Target Buy-In: €${targetOffer.toLocaleString()} | Est. Prep/Parts: ~€${estPartsDefault} → Est. Net Margin: €${estNetProfit.toLocaleString()}` + (item.daysOnMarket >= 30 ? ` (Stagnant ${item.daysOnMarket}d - strong cash leverage)` : '');
-
+                topCandidates.forEach(item => {
                     const div = document.createElement('div');
                     div.className = 'listing-card';
                     div.style.flexDirection = 'column';
@@ -1036,50 +1045,20 @@
                                 <div style="font-size:9px; color:#4b5563; background:#f3f4f6; padding:2px 4px; border-radius:4px; font-weight:bold;">⏳ ${item.daysOnMarket} Days</div>
                             </div>
                         </div>
-                        <div id="aiStrat_${idx}" style="font-size:11px; color:#0F172A; background:#FAF5FF; padding:10px; border-radius:8px; border:1px solid #E9D5FF; width:100%; margin-bottom:10px; line-height: 1.45;">
-                            <strong>🤖 AI Margin Strategy:</strong> ${baseStrategy}
+                        <div style="font-size:11px; color:#0F172A; background:#F8FAFC; padding:10px; border-radius:8px; border:1px solid #CBD5E1; width:100%; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                            <div><strong>${item.year} Retail Avg:</strong> €${item.estRetail.toLocaleString()} <span style="color:#64748B; font-size:10px;">(${item.sampleCount} ads)</span></div>
+                            <div style="color:#166534; font-weight:800; font-size:12px;">Gross Spread: +€${item.grossSpread.toLocaleString()}</div>
                         </div>
                         <div style="display:flex; gap:8px; width:100%;">
                             <a href="${item.adUrl}" target="_blank" rel="noopener noreferrer" class="btn-view" style="flex:1; background:#0F172A; display: flex; align-items: center; justify-content: center; text-decoration: none;">Open DoneDeal Ad ↗</a>
-                            <button class="btn-save" style="flex:1; background:#8B5CF6;" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.publishedDate}', ${item.daysOnMarket}, '${item.location}', '${item.adUrl}', 'AI Deal Finder')">⭐ Shortlist</button>
+                            <button class="btn-save" style="flex:1; background:#8B5CF6;" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.publishedDate}', ${item.daysOnMarket}, '${item.location}', '${item.adUrl}', 'Deal Finder')">⭐ Shortlist</button>
                         </div>
                     `;
                     feed.appendChild(div);
                 });
 
-                // Call Cloudflare Worker /api/ai-estimate (Gemini) on the top 6 deals for live mechanic assessment
-                const aiLimit = Math.min(6, topCandidates.length);
-                for (let i = 0; i < aiLimit; i++) {
-                    const item = topCandidates[i];
-                    const stratEl = document.getElementById(`aiStrat_${i}`);
-                    if (!stratEl) continue;
-
-                    try {
-                        const aiRes = await fetch(`${API_URL}/api/ai-estimate`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                vehicle: `${item.year} ${item.title} (Asking €${item.price}, Est. Repaired Retail €${item.estRetail}, ${item.daysOnMarket} days on market)`,
-                                task: `Assess flip viability, common mechanical/body prep needed for this listing, and recommended trade buy-in offer.`
-                            })
-                        });
-                        if (aiRes.ok) {
-                            const aiData = await aiRes.json();
-                            if (aiData && aiData.message && !aiData.message.includes("Worker AI Error")) {
-                                const partsEst = aiData.price > 0 ? Math.round(aiData.price) : (item.sectionType === 'Salvage' ? 550 : 300);
-                                const targetOffer = item.sectionType === 'Salvage' ? Math.round(item.price * 0.80) : Math.round(item.price * 0.88);
-                                const netMargin = Math.round(item.estRetail - targetOffer - partsEst);
-                                stratEl.innerHTML = `
-                                    <strong>🤖 AI Margin Strategy:</strong> Est. Retail: <b>€${item.estRetail.toLocaleString()}</b> | Target Offer: <b>€${targetOffer.toLocaleString()}</b> | Est. Parts: <b>€${partsEst}</b> (${aiData.hours || 4}h labour) → <span style="color:#166534; font-weight:800;">Est. Profit: €${netMargin.toLocaleString()}</span><br>
-                                    <span style="color:#475569;">💡 ${aiData.message}</span>
-                                `;
-                            }
-                        }
-                    } catch (e) {}
-                }
-
             } catch(e) {
-                feed.innerHTML = '<div style="font-size:12px; color:#DC2626; font-style:italic;">AI Analysis error: ' + e.message + '</div>';
+                feed.innerHTML = '<div style="font-size:12px; color:#DC2626; font-style:italic;">Scan error: ' + e.message + '</div>';
             }
         }
 
