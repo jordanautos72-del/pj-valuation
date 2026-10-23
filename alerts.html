@@ -65,6 +65,7 @@
         .listing-title { font-size: 13px; font-weight: 700; color: #0F172A; margin-bottom: 4px; }
         .listing-meta { font-size: 11px; color: #64748B; display: flex; gap: 8px; flex-wrap: wrap; }
         .year-badge { background: #0284C7; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 10px; }
+        .section-badge { background: #334155; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 10px; text-transform: uppercase; }
         .listing-repaired-col { text-align: center; padding: 0 10px; border-left: 1px solid #F1F5F9; border-right: 1px solid #F1F5F9; margin-right: 10px; }
         .listing-repaired-lbl { font-size: 9px; color: #64748B; font-weight: 700; text-transform: uppercase; }
         .listing-repaired-val { font-size: 13px; font-weight: 800; color: #6B21A8; }
@@ -80,7 +81,7 @@
 <body>
 
     <div class="header">
-        <h1>PJ WORKSHOP HUB <span style="font-size:10px; color:#94A3B8;">v2.3</span></h1>
+        <h1>PJ WORKSHOP HUB <span style="font-size:10px; color:#94A3B8;">v2.4</span></h1>
         <span id="modeTitle">Mileage Logger</span>
     </div>
 
@@ -160,19 +161,19 @@
         <div id="shortlistFeed"></div>
     </div>
 
-    <!-- HIT LIST CARD (UPDATED WITH AI DEAL FINDER) -->
+    <!-- HIT LIST CARD (MATCHED TO DESKTOP PC EXE) -->
     <div class="card" id="hitListCard" style="display: none;">
-        <h3 style="margin-top:0; font-size:14px; color:#DC2626;">🎯 Stagnant Inventory & AI Radar</h3>
-        <div style="font-size: 11px; color: #64748B; margin-bottom: 12px;">High-leverage vehicles sitting past their prime, or run an AI batch scan to calculate viable margins.</div>
+        <h3 style="margin-top:0; font-size:14px; color:#DC2626;">🎯 Stagnant Inventory (45+ Days) & AI Flip Radar</h3>
+        <div style="font-size: 11px; color: #64748B; margin-bottom: 12px;">High-leverage vehicles sitting past their prime, or run an AI batch scan across DoneDeal to calculate viable margins.</div>
         
         <div style="display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap;">
-            <button class="btn-primary" onclick="loadHitList('damagedcars')" id="btnHitSalvage" style="flex:1;">💥 Salvage</button>
-            <button class="btn-sec" onclick="loadHitList('cars')" id="btnHitStandard" style="flex:1;">🚗 Standard</button>
-            <button class="btn-sec" onclick="runAiDealFinder()" id="btnHitAi" style="flex:1;">🤖 AI Deals</button>
+            <button class="btn-primary" onclick="loadHitList('damagedcars')" id="btnHitSalvage" style="flex:1;">💥 Salvage Hit List</button>
+            <button class="btn-sec" onclick="loadHitList('cars')" id="btnHitStandard" style="flex:1;">🚗 Standard Hit List</button>
+            <button class="btn-sec" onclick="runAiDealFinder()" id="btnHitAi" style="flex:1; background:#8B5CF6; color:#FFF;">🤖 AI Deal Finder</button>
         </div>
 
         <div id="hitListFeed">
-            <div style="font-size: 12px; color: #64748B; font-style: italic;">Select a category above to scan your targets...</div>
+            <div style="font-size: 12px; color: #0284C7; font-style: italic;">Click a category above or run the AI Deal Finder...</div>
         </div>
     </div>
 
@@ -308,8 +309,41 @@
             'Citroen': ['C3', 'C4', 'Berlingo', 'C4 Cactus', 'Dispatch', 'Relay']
         };
 
+        // Strict filter to eliminate parts, breaking, and wanted ads just like the PC EXE
+        const JUNK_KEYWORDS = [
+            'breaking', 'for parts', 'parts only', 'spares', 'dismantling', 'shell', 
+            'engine only', 'gearbox only', 'wheels', 'alloys', 'headlight', 'bumper', 
+            'bonnet', 'tailgate', 'doors', 'seats', 'interior', 'catalytic', 'dpf', 
+            'injector', 'turbo', 'ecu', 'wanted', 'looking for', 'cash waiting', 'scrap'
+        ];
+
+        function isRealVehicleAd(ad, minYear) {
+            if (!ad || !ad.title) return false;
+            const t = ad.title.toLowerCase();
+            
+            // 1. Block any parts / breaking / wanted keywords
+            for (let kw of JUNK_KEYWORDS) {
+                if (t.includes(kw)) return false;
+            }
+            
+            // 2. Block €1, €10, €50, €100, €1234 dummy prices used by breakers
+            if (!ad.price || ad.price < 250 || ad.price === 1234 || ad.price === 12345 || ad.price === 99999) {
+                return false;
+            }
+
+            // 3. Enforce a valid registration year (Parts ads almost always have year === "N/A")
+            if (!ad.year || ad.year === "N/A") {
+                return false;
+            }
+            const y = parseInt(ad.year);
+            if (isNaN(y) || (minYear && y < minYear)) {
+                return false;
+            }
+
+            return true;
+        }
+
         async function initDropdowns() {
-            // Set today's date on the mileage tab
             document.getElementById('milDate').valueAsDate = new Date();
 
             try {
@@ -397,8 +431,8 @@
                 document.getElementById('modeTitle').innerText = 'Multi-Alert Scanners';
                 loadAlertConfig().then(() => triggerInstantScan());
             } else if (section === 'hitlist') {
-                document.getElementById('modeTitle').innerText = '🎯 Stagnant Hit List & AI Finder';
-                loadAlertConfig().then(() => loadHitList('damagedcars'));
+                document.getElementById('modeTitle').innerText = '🎯 Hit List & AI Deal Finder';
+                loadAlertConfig();
             } else if (section === 'shortlist') {
                 document.getElementById('modeTitle').innerText = '⭐ Saved Shortlist';
                 loadShortlistFromCloud();
@@ -449,7 +483,7 @@
         async function submitMileage() {
             const dateStr = document.getElementById('milDate').value;
             const parts = dateStr.split('-');
-            const formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY formatting
+            const formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
 
             const reg = document.getElementById('milReg').value.toUpperCase();
             const dest = document.getElementById('milDest').value;
@@ -461,11 +495,9 @@
                 return;
             }
 
-            // Calculate financial split
             const gross = miles * rate;
             const net = gross / 1.23;
             const vat = gross - net;
-            
             const notes = `${dest} (${miles.toFixed(1)} mi @ €${rate.toFixed(2)}/mi)`;
             
             const btn = document.getElementById('btnSubmitMil');
@@ -479,12 +511,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        date: formattedDate,
-                        reg: reg,
-                        net: net,
-                        gross: gross,
-                        vat: vat,
-                        notes: notes
+                        date: formattedDate, reg: reg, net: net, gross: gross, vat: vat, notes: notes
                     })
                 });
                 
@@ -511,7 +538,6 @@
         }
 
         // --- ALERTS AND SCANNER CONFIG LOGIC ---
-
         async function loadAlertConfig() {
             try {
                 const res = await fetch(`${API_URL}/api/config`);
@@ -714,8 +740,8 @@
                 btn.innerText = '☁️ Upload to Laptop Inbox';
             }
         }
-        // -----------------------------
 
+        // --- SHORTLIST LOGIC ---
         async function loadShortlistFromCloud() {
             try {
                 const res = await fetch(`${API_URL}/api/shortlist`);
@@ -783,7 +809,7 @@
                 let yStr = item.year && item.year !== "N/A" ? `<span class="year-badge">${item.year}</span>` : '';
                 let locStr = item.location ? `<span>📍 ${item.location}</span>` : '';
                 let profStr = item.searchProfile ? `<div class="listing-meta" style="margin-top: 4px;"><span style="color:#0284C7; font-weight:bold;">[${item.searchProfile}]</span></div>` : '';
-                const linkHtml = (item.adUrl && item.adUrl !== '#') ? `<a href="${item.adUrl}" target="_blank" class="btn-view" style="width: 100%; text-align: center; margin-bottom: 6px;">View Ad ↗</a>` : '';
+                const linkHtml = (item.adUrl && item.adUrl !== '#') ? `<a href="${item.adUrl}" target="_blank" rel="noopener noreferrer" class="btn-view" style="width: 100%; text-align: center; margin-bottom: 6px;">View Ad ↗</a>` : '';
                 
                 list.innerHTML += `
                     <div class="listing-card" style="margin-bottom: 8px;">
@@ -805,31 +831,35 @@
             });
         }
 
+        // --- HIT LIST & AI DEAL FINDER LOGIC (MATCHING PC EXE) ---
         async function loadHitList(category) {
             document.getElementById('btnHitSalvage').className = category === 'damagedcars' ? 'btn-primary' : 'btn-sec';
             document.getElementById('btnHitStandard').className = category === 'cars' ? 'btn-primary' : 'btn-sec';
-            
-            // Reset AI Button styles
             document.getElementById('btnHitAi').className = 'btn-sec';
-            document.getElementById('btnHitAi').style.background = '';
-            document.getElementById('btnHitAi').style.color = '';
+            document.getElementById('btnHitAi').style.background = '#E2E8F0';
+            document.getElementById('btnHitAi').style.color = '#334155';
 
             const feed = document.getElementById('hitListFeed');
             feed.innerHTML = '<div style="font-size:12px; color:#0284C7; font-style:italic;">Hunting for stagnant inventory (45+ Days)...</div>';
 
-            const targets = savedAlerts.filter(a => a.section === category);
+            if (!savedAlerts || savedAlerts.length === 0) {
+                await loadAlertConfig();
+            }
+
+            let targets = savedAlerts.filter(a => a.section === category && a.active !== false);
             if (targets.length === 0) {
-                feed.innerHTML = `<div style="font-size:12px; color:#64748B; font-style:italic;">No active scanners found for this category. Add scanners in Alerts tab.</div>`;
-                return;
+                // Fallback default broad scan if no alerts configured for this category
+                targets = [{ make: 'Any', model: 'Any', section: category, yearFrom: 2012, yearTo: new Date().getFullYear(), minPrice: 350, price: 6500 }];
             }
 
             let stagnantListings = [];
             for (let config of targets) {
                 try {
+                    const minP = Math.max(parseFloat(config.minPrice) || 0, category === 'damagedcars' ? 300 : 500);
                     const payload = {
                         make: config.make, model: config.model, section: category,
-                        yearFrom: parseInt(config.yearFrom), yearTo: parseInt(config.yearTo),
-                        minPrice: parseFloat(config.minPrice) || 0, maxPrice: parseFloat(config.price) || 999999,
+                        yearFrom: parseInt(config.yearFrom) || 2010, yearTo: parseInt(config.yearTo) || new Date().getFullYear(),
+                        minPrice: minP, maxPrice: parseFloat(config.price) || 999999,
                         minDom: 45
                     };
                     const res = await fetch(`${API_URL}/api/search`, {
@@ -838,7 +868,7 @@
                     const data = await res.json();
                     if (data && data.listings) {
                         data.listings.forEach(ad => {
-                            if (!stagnantListings.find(l => l.adUrl === ad.adUrl)) {
+                            if (isRealVehicleAd(ad, payload.yearFrom) && !stagnantListings.find(l => l.adUrl === ad.adUrl)) {
                                 stagnantListings.push(ad);
                             }
                         });
@@ -847,7 +877,7 @@
             }
 
             if (stagnantListings.length === 0) {
-                feed.innerHTML = '<div style="font-size:12px; color:#16A34A; font-style:italic;">No stagnant inventory found. The market is moving fast!</div>';
+                feed.innerHTML = '<div style="font-size:12px; color:#16A34A; font-style:italic;">No stagnant whole vehicles found (45+ days). Parts & breakers filtered out.</div>';
                 return;
             }
 
@@ -868,7 +898,7 @@
                     <div class="listing-price-col">
                         <div class="listing-price" style="color: #0F172A;">€${Math.round(item.price).toLocaleString()}</div>
                         <div style="display: flex; gap: 4px;">
-                            <a href="${item.adUrl}" target="_blank" class="btn-view" style="background:#DC2626;">Lowball ↗</a>
+                            <a href="${item.adUrl}" target="_blank" rel="noopener noreferrer" class="btn-view" style="background:#DC2626;">Lowball ↗</a>
                             <button class="btn-save" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.publishedDate}', ${item.daysOnMarket}, '${item.location}', '${item.adUrl}', 'Hit List')">⭐</button>
                         </div>
                     </div>
@@ -885,56 +915,107 @@
             document.getElementById('btnHitAi').style.color = '#FFFFFF';
             
             const feed = document.getElementById('hitListFeed');
-            feed.innerHTML = '<div style="font-size:12px; color:#8B5CF6; font-style:italic;">Running AI batch analysis on active scanners... assessing margins...</div>';
+            feed.innerHTML = '<div style="font-size:12px; color:#8B5CF6; font-weight:bold;">🔍 Running DoneDeal Batch Scan & AI Flip Radar...</div>';
 
             try {
-                if (savedAlerts.length === 0) {
-                    feed.innerHTML = '<div style="font-size:12px; color:#64748B; font-style:italic;">No active scanners found. Add some in the Alerts tab first.</div>';
-                    return;
+                if (!savedAlerts || savedAlerts.length === 0) {
+                    await loadAlertConfig();
                 }
 
-                let stagnantListings = [];
-                // Query the API directly for all active scanners
-                for (let config of savedAlerts) {
+                // Gather active profiles or use comprehensive default trade batch profiles like PC EXE
+                let batchProfiles = savedAlerts.filter(a => a.active !== false);
+                if (batchProfiles.length === 0) {
+                    batchProfiles = [
+                        { make: 'Ford', model: 'Mondeo', section: 'damagedcars', yearFrom: 2013, yearTo: 2022, minPrice: 350, price: 4000 },
+                        { make: 'Ford', model: 'Focus', section: 'damagedcars', yearFrom: 2013, yearTo: 2022, minPrice: 350, price: 4000 },
+                        { make: 'Volkswagen', model: 'Golf', section: 'damagedcars', yearFrom: 2012, yearTo: 2022, minPrice: 400, price: 4500 },
+                        { make: 'Volkswagen', model: 'Passat', section: 'damagedcars', yearFrom: 2012, yearTo: 2022, minPrice: 400, price: 4500 },
+                        { make: 'Hyundai', model: 'Tucson', section: 'damagedcars', yearFrom: 2014, yearTo: 2022, minPrice: 500, price: 5500 },
+                        { make: 'Peugeot', model: '308', section: 'damagedcars', yearFrom: 2013, yearTo: 2022, minPrice: 350, price: 3500 },
+                        { make: 'Skoda', model: 'Octavia', section: 'damagedcars', yearFrom: 2013, yearTo: 2022, minPrice: 400, price: 4500 },
+                        { make: 'Toyota', model: 'Corolla', section: 'damagedcars', yearFrom: 2012, yearTo: 2022, minPrice: 400, price: 4500 }
+                    ];
+                }
+
+                let candidateDeals = [];
+
+                for (let i = 0; i < batchProfiles.length; i++) {
+                    const prof = batchProfiles[i];
+                    const make = prof.make || 'Any';
+                    const model = prof.model || 'Any';
+                    const sec = prof.section || 'damagedcars';
+                    const yFrom = parseInt(prof.yearFrom) || 2012;
+                    const yTo = parseInt(prof.yearTo) || new Date().getFullYear();
+                    const minP = Math.max(parseFloat(prof.minPrice) || 350, sec === 'damagedcars' ? 300 : 500);
+                    const maxP = parseFloat(prof.price) || 6000;
+
+                    feed.innerHTML = `<div style="font-size:12px; color:#8B5CF6; font-style:italic;">Scanning batch (${i + 1}/${batchProfiles.length}): ${make} ${model} (${sec === 'damagedcars' ? 'Salvage' : 'Standard'})...</div>`;
+
                     try {
-                        const payload = {
-                            make: config.make, model: config.model, section: config.section,
-                            yearFrom: parseInt(config.yearFrom), yearTo: parseInt(config.yearTo),
-                            minPrice: parseFloat(config.minPrice) || 0, maxPrice: parseFloat(config.price) || 999999,
-                            minDom: 45
+                        let searchWord = (model === "Any" || model === "") ? make : model;
+                        const mainPayload = {
+                            make: make, model: searchWord, section: sec,
+                            yearFrom: yFrom, yearTo: yTo, minPrice: minP, maxPrice: maxP, minDom: 0
                         };
-                        const res = await fetch(`${API_URL}/api/search`, {
-                            method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' }
+
+                        // Also fetch standard market average so we know the true retail resale value
+                        const stdPayload = {
+                            make: make, model: searchWord, section: 'cars',
+                            yearFrom: yFrom, yearTo: yTo, minPrice: 1200, maxPrice: 25000, minDom: 0
+                        };
+
+                        const [mainRes, stdRes] = await Promise.all([
+                            fetch(`${API_URL}/api/search`, { method: 'POST', body: JSON.stringify(mainPayload), headers: { 'Content-Type': 'application/json' } }).then(r => r.ok ? r.json() : null).catch(() => null),
+                            sec === 'damagedcars' 
+                                ? fetch(`${API_URL}/api/search`, { method: 'POST', body: JSON.stringify(stdPayload), headers: { 'Content-Type': 'application/json' } }).then(r => r.ok ? r.json() : null).catch(() => null)
+                                : Promise.resolve(null)
+                        ]);
+
+                        if (!mainRes || !mainRes.listings) continue;
+
+                        const retailAvg = (sec === 'damagedcars' && stdRes && stdRes.stats && stdRes.stats.avg > 0)
+                            ? stdRes.stats.avg
+                            : (mainRes.stats ? mainRes.stats.avg : 0);
+                        const tradeLow = mainRes.stats ? mainRes.stats.low : 0;
+
+                        mainRes.listings.forEach(ad => {
+                            if (!isRealVehicleAd(ad, yFrom)) return;
+                            if (candidateDeals.find(d => d.adUrl === ad.adUrl)) return;
+
+                            let estRetail = retailAvg > ad.price ? retailAvg : Math.round(ad.price * 1.45);
+                            let grossSpread = estRetail - ad.price;
+
+                            // Filter for genuine flip margin opportunities or stagnant bargains
+                            if (sec === 'damagedcars' || ad.price <= tradeLow * 1.15 || ad.daysOnMarket >= 25 || grossSpread >= 1000) {
+                                candidateDeals.push({
+                                    ...ad,
+                                    sectionType: sec === 'damagedcars' ? 'Salvage' : 'Standard',
+                                    estRetail: Math.round(estRetail),
+                                    grossSpread: Math.round(grossSpread)
+                                });
+                            }
                         });
-                        const data = await res.json();
-                        if (data && data.listings) {
-                            data.listings.forEach(ad => {
-                                if (!stagnantListings.find(l => l.adUrl === ad.adUrl)) {
-                                    stagnantListings.push(ad);
-                                }
-                            });
-                        }
-                    } catch(e) {}
+                    } catch (err) {}
                 }
 
-                if (stagnantListings.length === 0) {
-                    feed.innerHTML = '<div style="font-size:12px; color:#16A34A; font-style:italic;">No stagnant inventory found to analyze.</div>';
+                if (candidateDeals.length === 0) {
+                    feed.innerHTML = '<div style="font-size:12px; color:#64748B; font-style:italic;">No high-margin whole vehicles found in this batch (all parts/breakers excluded). Add more models in Alerts or widen your price range.</div>';
                     return;
                 }
 
-                // Sort by highest days on market and analyze the top ones
-                stagnantListings.sort((a, b) => b.daysOnMarket - a.daysOnMarket);
-                const topDeals = stagnantListings.slice(0, 8); 
+                // Rank by best potential spread + days on market leverage
+                candidateDeals.sort((a, b) => (b.grossSpread + (b.daysOnMarket * 15)) - (a.grossSpread + (a.daysOnMarket * 15)));
+                const topCandidates = candidateDeals.slice(0, 20);
 
-                feed.innerHTML = '';
-                topDeals.forEach(item => {
-                    let targetOffer = Math.round(item.price * 0.85); 
-                    let assessment = `High Margin Target. Asking €${item.price.toLocaleString()} but stagnant for ${item.daysOnMarket} days. Target a lowball cash offer around €${targetOffer.toLocaleString()} to secure a viable margin.`;
-                    
-                    if (item.title.toLowerCase().includes("damaged") || item.title.toLowerCase().includes("salvage") || item.price < 2000) {
-                        targetOffer = Math.round(item.price * 0.75);
-                        assessment = `Salvage/Prep Flip. Stagnant project. Target €${targetOffer.toLocaleString()} buy-in to leave room for prep/parts and ensure a strong ROI.`;
-                    }
+                // Render cards immediately with baseline margin calculations, then enrich top deals via Cloudflare /api/ai-estimate
+                feed.innerHTML = `<div style="font-size:11px; color:#16A34A; font-weight:bold; margin-bottom:8px;">✅ Found ${topCandidates.length} verified whole-car flip targets (Parts filtered out):</div>`;
+
+                topCandidates.forEach((item, idx) => {
+                    const targetOffer = item.sectionType === 'Salvage' ? Math.round(item.price * 0.80) : Math.round(item.price * 0.88);
+                    const estPartsDefault = item.sectionType === 'Salvage' ? 550 : 300;
+                    const estNetProfit = Math.max(0, item.estRetail - targetOffer - estPartsDefault);
+
+                    const baseStrategy = `Est. Retail Value: €${item.estRetail.toLocaleString()} | Target Buy-In: €${targetOffer.toLocaleString()} | Est. Prep/Parts: ~€${estPartsDefault} → Est. Net Margin: €${estNetProfit.toLocaleString()}` + (item.daysOnMarket >= 30 ? ` (Stagnant ${item.daysOnMarket}d - strong cash leverage)` : '');
 
                     const div = document.createElement('div');
                     div.className = 'listing-card';
@@ -943,26 +1024,62 @@
                     div.innerHTML = `
                         <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:8px;">
                             <div style="flex: 1; padding-right: 10px;">
-                                <div class="listing-title" style="color:#0F172A; word-break: break-all;">${item.title}</div>
-                                <div class="listing-meta"><span class="year-badge">${item.year}</span><span>📍 ${item.location}</span></div>
+                                <div class="listing-title" style="color:#0F172A;">${item.title}</div>
+                                <div class="listing-meta">
+                                    <span class="year-badge">${item.year}</span>
+                                    <span class="section-badge" style="background:${item.sectionType === 'Salvage' ? '#DC2626' : '#0284C7'};">${item.sectionType}</span>
+                                    <span>📍 ${item.location}</span>
+                                </div>
                             </div>
-                            <div style="text-align:right; min-width: 80px;">
+                            <div style="text-align:right; min-width: 85px;">
                                 <div class="listing-price" style="color:#0F172A; margin-bottom: 2px;">€${Math.round(item.price).toLocaleString()}</div>
                                 <div style="font-size:9px; color:#4b5563; background:#f3f4f6; padding:2px 4px; border-radius:4px; font-weight:bold;">⏳ ${item.daysOnMarket} Days</div>
                             </div>
                         </div>
-                        <div style="font-size:11px; color:#0F172A; background:#FAF5FF; padding:10px; border-radius:8px; border:1px solid #E9D5FF; width:100%; margin-bottom:10px; line-height: 1.4;">
-                            <strong>🤖 AI Strategy:</strong> ${assessment}
+                        <div id="aiStrat_${idx}" style="font-size:11px; color:#0F172A; background:#FAF5FF; padding:10px; border-radius:8px; border:1px solid #E9D5FF; width:100%; margin-bottom:10px; line-height: 1.45;">
+                            <strong>🤖 AI Margin Strategy:</strong> ${baseStrategy}
                         </div>
                         <div style="display:flex; gap:8px; width:100%;">
-                            <a href="${item.adUrl}" target="_blank" class="btn-view" style="flex:1; background:#0F172A; display: flex; align-items: center; justify-content: center; text-decoration: none;">View Ad ↗</a>
-                            <button class="btn-save" style="flex:1; background:#8B5CF6;" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', 'Recent', ${item.daysOnMarket}, '${item.location}', '${item.adUrl}', 'AI Deal Finder')">⭐ Shortlist</button>
+                            <a href="${item.adUrl}" target="_blank" rel="noopener noreferrer" class="btn-view" style="flex:1; background:#0F172A; display: flex; align-items: center; justify-content: center; text-decoration: none;">Open DoneDeal Ad ↗</a>
+                            <button class="btn-save" style="flex:1; background:#8B5CF6;" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.publishedDate}', ${item.daysOnMarket}, '${item.location}', '${item.adUrl}', 'AI Deal Finder')">⭐ Shortlist</button>
                         </div>
                     `;
                     feed.appendChild(div);
                 });
+
+                // Call Cloudflare Worker /api/ai-estimate (Gemini) on the top 6 deals for live mechanic assessment
+                const aiLimit = Math.min(6, topCandidates.length);
+                for (let i = 0; i < aiLimit; i++) {
+                    const item = topCandidates[i];
+                    const stratEl = document.getElementById(`aiStrat_${i}`);
+                    if (!stratEl) continue;
+
+                    try {
+                        const aiRes = await fetch(`${API_URL}/api/ai-estimate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                vehicle: `${item.year} ${item.title} (Asking €${item.price}, Est. Repaired Retail €${item.estRetail}, ${item.daysOnMarket} days on market)`,
+                                task: `Assess flip viability, common mechanical/body prep needed for this listing, and recommended trade buy-in offer.`
+                            })
+                        });
+                        if (aiRes.ok) {
+                            const aiData = await aiRes.json();
+                            if (aiData && aiData.message && !aiData.message.includes("Worker AI Error")) {
+                                const partsEst = aiData.price > 0 ? Math.round(aiData.price) : (item.sectionType === 'Salvage' ? 550 : 300);
+                                const targetOffer = item.sectionType === 'Salvage' ? Math.round(item.price * 0.80) : Math.round(item.price * 0.88);
+                                const netMargin = Math.round(item.estRetail - targetOffer - partsEst);
+                                stratEl.innerHTML = `
+                                    <strong>🤖 AI Margin Strategy:</strong> Est. Retail: <b>€${item.estRetail.toLocaleString()}</b> | Target Offer: <b>€${targetOffer.toLocaleString()}</b> | Est. Parts: <b>€${partsEst}</b> (${aiData.hours || 4}h labour) → <span style="color:#166534; font-weight:800;">Est. Profit: €${netMargin.toLocaleString()}</span><br>
+                                    <span style="color:#475569;">💡 ${aiData.message}</span>
+                                `;
+                            }
+                        }
+                    } catch (e) {}
+                }
+
             } catch(e) {
-                feed.innerHTML = '<div style="font-size:12px; color:#DC2626; font-style:italic;">AI Analysis failed.</div>';
+                feed.innerHTML = '<div style="font-size:12px; color:#DC2626; font-style:italic;">AI Analysis error: ' + e.message + '</div>';
             }
         }
 
@@ -993,7 +1110,7 @@
                     return;
                 }
                 feed.innerHTML = '';
-                data.matches.forEach(item => {
+                data.matches.filter(item => isRealVehicleAd(item, 2006)).forEach(item => {
                     const div = document.createElement('div');
                     div.className = 'listing-card';
                     div.innerHTML = `
@@ -1010,7 +1127,7 @@
                         <div class="listing-price-col">
                             <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
                             <div style="display: flex; gap: 4px;">
-                                <a href="${item.adUrl}" target="_blank" class="btn-view">View ↗</a>
+                                <a href="${item.adUrl}" target="_blank" rel="noopener noreferrer" class="btn-view">View ↗</a>
                                 <button class="btn-save" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.publishedDate}', ${item.daysOnMarket}, '${item.location}', '${item.adUrl}', 'Alert')">⭐</button>
                             </div>
                         </div>
@@ -1032,7 +1149,7 @@
             const payload = {
                 make: make, model: searchWord, section: currentSection,
                 yearFrom: parseInt(yearFrom), yearTo: parseInt(yearTo),
-                minPrice: currentSection === 'damagedcars' ? 150 : 400, maxPrice: 999999, minDom: 0
+                minPrice: currentSection === 'damagedcars' ? 250 : 400, maxPrice: 999999, minDom: 0
             };
 
             let stdAvg = 0;
@@ -1060,7 +1177,7 @@
             }
 
             const stats = mainResult.stats || { low: 0, avg: 0, high: 0 };
-            const listings = mainResult.listings;
+            const listings = mainResult.listings.filter(item => isRealVehicleAd(item, parseInt(yearFrom)));
 
             if (currentSection === 'cars') {
                 currentMarketAvg = stats.avg;
@@ -1096,14 +1213,14 @@
                     <div class="listing-price-col">
                         <div class="listing-price">€${Math.round(item.price).toLocaleString()}</div>
                         <div style="display: flex; gap: 4px;">
-                            ${item.adUrl ? `<a href="${item.adUrl}" target="_blank" class="btn-view">View ↗</a>` : ''}
+                            ${item.adUrl ? `<a href="${item.adUrl}" target="_blank" rel="noopener noreferrer" class="btn-view">View ↗</a>` : ''}
                             <button class="btn-save" onclick="saveToShortlistDirect(decodeURIComponent('${encodeURIComponent(item.title)}'), ${item.price}, '${item.year}', '${item.publishedDate}', ${item.daysOnMarket}, '${item.location}', '${item.adUrl}', 'Market Guide')">⭐</button>
                         </div>
                     </div>
                 `;
                 container.appendChild(div);
             });
-            status.innerText = `Market guide updated via Cloudflare edge (${listings.length} vehicles found).`;
+            status.innerText = `Market guide updated via Cloudflare edge (${listings.length} clean vehicles found).`;
         }
 
         function calculateTradeMargin() {
